@@ -3,10 +3,10 @@
 //! 结构：主线程跑 GTK 悬浮窗口；后台线程跑 tokio，读 evdev 事件并把
 //! 格式化好的显示字符串通过 channel 交给 UI 线程。
 
+mod app;
 mod config;
 mod input;
 mod overlay;
-mod tray;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
@@ -69,7 +69,7 @@ fn spawn_keyboard_thread(
         let rt = tokio::runtime::Runtime::new().expect("创建 tokio runtime 失败");
         rt.block_on(async move {
             // 托盘图标（SNI）：保持 Handle 存活；失败只告警，不影响按键显示
-            let _tray = tray::run(quit).await;
+            let _tray = app::tray::run(quit).await;
 
             let (ktx, krx) = tokio::sync::mpsc::channel(256);
 

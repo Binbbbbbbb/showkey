@@ -15,7 +15,7 @@ pub const MARGIN: i32 = 24;
 pub const SPACING: i32 = 8;
 
 /// 胶囊圆角半径（像素）。
-pub const BORDER_RADIUS: u32 = 20;
+pub const BORDER_RADIUS: u32 = 18;
 
 /// 胶囊背景透明度，0.0（全透明）~ 1.0（不透明）。
 pub const CHIP_ALPHA: f32 = 0.85;

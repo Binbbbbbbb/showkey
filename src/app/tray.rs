@@ -3,8 +3,8 @@
 //! 基于 [`ksni`]（freedesktop StatusNotifierItem 的 Rust 实现，走 DBus）。图标直接用
 //! `icon/icon.svg`：quickshell 会按 `IconName` + `IconThemePath` 拼成文件路径加载。
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use ksni::menu::StandardItem;
 use ksni::{MenuItem, Tray, TrayMethods};
@@ -33,14 +33,16 @@ impl Tray for ShowkeyTray {
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
-        vec![StandardItem {
-            label: "退出".into(),
-            activate: Box::new(|tray: &mut Self| {
-                tray.quit.store(true, Ordering::SeqCst);
-            }),
-            ..Default::default()
-        }
-        .into()]
+        vec![
+            StandardItem {
+                label: "退出".into(),
+                activate: Box::new(|tray: &mut Self| {
+                    tray.quit.store(true, Ordering::SeqCst);
+                }),
+                ..Default::default()
+            }
+            .into(),
+        ]
     }
 }
 
