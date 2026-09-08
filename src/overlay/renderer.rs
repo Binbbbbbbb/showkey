@@ -118,10 +118,13 @@ impl Overlay {
 
         // 每个胶囊独立计时，到点从容器移除；若清空则隐藏窗口，
         // 强制 layer-shell 表面重新映射，避免最后一枚胶囊的画面残留。
+        // 若该胶囊已因超过上限被提前移除（parent 为空），则跳过，避免重复 remove。
         let container = self.container.clone();
         let window = self.window.clone();
         glib::timeout_add_local_once(duration, move || {
-            container.remove(&label);
+            if label.parent().is_some() {
+                container.remove(&label);
+            }
             if container.first_child().is_none() {
                 window.set_visible(false);
             }
