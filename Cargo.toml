@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 evdev = { version = "0.13.2", features = ["tokio"] } # 输入设备事件；tokio 特性用于异步事件流
+input = "0.10.0"                                      # libinput 绑定：鼠标 / 触控板手势
+libc = "0.2"                                          # LibinputInterface 打开设备文件
 tokio = { version = "1.0", features = ["full"] }     # 异步运行时，用于事件循环
 gtk4 = "0.11"                                        # GUI：悬浮窗口
 gtk4-layer-shell = "0.8"                             # Wayland layer-shell 悬浮层

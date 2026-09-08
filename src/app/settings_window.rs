@@ -18,7 +18,7 @@ use crate::overlay::Overlay;
 struct Strings {
     title: &'static str,
     sections: [&'static str; 4],
-    rows: [&'static str; 11],
+    rows: [&'static str; 12],
     light: &'static str,
     dark: &'static str,
     positions: [&'static str; 4],
@@ -36,7 +36,8 @@ impl Strings {
                     "界面主题",
                     "胶囊配色",
                     "语言",
-                    "透明度 (%)",
+                    "最新透明度 (%)",
+                    "历史透明度 (%)",
                     "圆角 (px)",
                     "间距 (px)",
                     "位置",
@@ -58,7 +59,8 @@ impl Strings {
                     "Theme",
                     "Chip color",
                     "Language",
-                    "Opacity (%)",
+                    "Latest opacity (%)",
+                    "History opacity (%)",
                     "Corner radius (px)",
                     "Spacing (px)",
                     "Position",
@@ -107,6 +109,7 @@ fn window_css(theme: Theme) -> String {
     color: {fg};
 }}
 .settings-root {{
+    background-color: {bg};
     padding: 12px 20px 20px 20px;
 }}
 .section-header {{
@@ -148,6 +151,15 @@ fn window_css(theme: Theme) -> String {
         close_fg = close_fg,
         close_hover = close_hover,
     )
+}
+
+/// 屏幕工作区高度（像素），用于限制设置窗口最大高度为屏幕的 60%。取不到就回退 900。
+fn screen_workarea_height() -> i32 {
+    gtk::gdk::Display::default()
+        .and_then(|d| d.monitors().item(0))
+        .and_then(|m| m.downcast::<gtk::gdk::Monitor>().ok())
+        .map(|m| m.geometry().height())
+        .unwrap_or(900)
 }
 
 /// 整数取值用的 `SpinButton`。
@@ -223,6 +235,7 @@ pub struct SettingsWindow {
     lang_dropdown: gtk::DropDown,
     position_dropdown: gtk::DropDown,
     alpha_spin: gtk::SpinButton,
+    alpha_history_spin: gtk::SpinButton,
     radius_spin: gtk::SpinButton,
     spacing_spin: gtk::SpinButton,
     margin_x_spin: gtk::SpinButton,
@@ -245,11 +258,14 @@ impl SettingsWindow {
         overlay: Rc<Overlay>,
         refresh_tx: UnboundedSender<()>,
     ) -> Rc<Self> {
+        // 最大高度 = 屏幕高度的 60%；默认高度取 640 与 60% 的较小值，内容超出可滚动
+        let target_height = 640.min(screen_workarea_height() * 60 / 100);
+
         let window = gtk::Window::builder()
             .application(app)
             .title("设置")
             .default_width(440)
-            .default_height(640)
+            .default_height(target_height)
             .resizable(false)
             .build();
         window.add_css_class("settings-window");
@@ -279,6 +295,8 @@ impl SettingsWindow {
 
         // 数字控件
         let alpha_spin = make_spin(f64::from(init.chip_alpha) * 100.0, 0.0, 100.0, 5.0);
+        let alpha_history_spin =
+            make_spin(f64::from(init.chip_alpha_history) * 100.0, 0.0, 100.0, 5.0);
         let radius_spin = make_spin(f64::from(init.border_radius), 0.0, 50.0, 1.0);
         let spacing_spin = make_spin(f64::from(init.spacing), 0.0, 100.0, 2.0);
         let margin_x_spin = make_spin(f64::from(init.margin_x), 0.0, 200.0, 4.0);
@@ -314,17 +332,18 @@ impl SettingsWindow {
 
         section_headers.push(add_section(&root, strings.sections[1]));
         row_labels.push(add_row(&root, strings.rows[3], &alpha_spin));
-        row_labels.push(add_row(&root, strings.rows[4], &radius_spin));
-        row_labels.push(add_row(&root, strings.rows[5], &spacing_spin));
+        row_labels.push(add_row(&root, strings.rows[4], &alpha_history_spin));
+        row_labels.push(add_row(&root, strings.rows[5], &radius_spin));
+        row_labels.push(add_row(&root, strings.rows[6], &spacing_spin));
 
         section_headers.push(add_section(&root, strings.sections[2]));
-        row_labels.push(add_row(&root, strings.rows[6], &position_dropdown));
-        row_labels.push(add_row(&root, strings.rows[7], &margin_x_spin));
-        row_labels.push(add_row(&root, strings.rows[8], &margin_y_spin));
+        row_labels.push(add_row(&root, strings.rows[7], &position_dropdown));
+        row_labels.push(add_row(&root, strings.rows[8], &margin_x_spin));
+        row_labels.push(add_row(&root, strings.rows[9], &margin_y_spin));
 
         section_headers.push(add_section(&root, strings.sections[3]));
-        row_labels.push(add_row(&root, strings.rows[9], &duration_spin));
-        row_labels.push(add_row(&root, strings.rows[10], &max_chips_spin));
+        row_labels.push(add_row(&root, strings.rows[10], &duration_spin));
+        row_labels.push(add_row(&root, strings.rows[11], &max_chips_spin));
 
         // 底部按钮：重置（改回默认，仅草稿）+ 保存（真正生效）
         let reset_button = gtk::Button::with_label(strings.reset);
@@ -337,7 +356,12 @@ impl SettingsWindow {
         buttons.append(&save_button);
         root.append(&buttons);
 
-        window.set_child(Some(&root));
+        // 窗口高度固定（target_height），内容超出时滚动
+        let scrolled = gtk::ScrolledWindow::new();
+        scrolled.set_hscrollbar_policy(gtk::PolicyType::Never);
+        scrolled.set_vscrollbar_policy(gtk::PolicyType::Automatic);
+        scrolled.set_child(Some(&root));
+        window.set_child(Some(&scrolled));
 
         // 关闭按钮 = 隐藏而非销毁，可重复打开
         window.connect_close_request(|w| {
@@ -356,6 +380,7 @@ impl SettingsWindow {
             lang_dropdown,
             position_dropdown,
             alpha_spin,
+            alpha_history_spin,
             radius_spin,
             spacing_spin,
             margin_x_spin,
@@ -425,6 +450,7 @@ impl SettingsWindow {
             s.language = language;
             s.position = position;
             s.chip_alpha = (self.alpha_spin.value() as f32) / 100.0;
+            s.chip_alpha_history = (self.alpha_history_spin.value() as f32) / 100.0;
             s.border_radius = self.radius_spin.value() as u32;
             s.spacing = self.spacing_spin.value() as i32;
             s.margin_x = self.margin_x_spin.value() as i32;
@@ -456,6 +482,8 @@ impl SettingsWindow {
         self.lang_dropdown.set_selected(lang_index(s.language));
         self.position_dropdown.set_selected(position_index(s.position));
         self.alpha_spin.set_value(f64::from(s.chip_alpha) * 100.0);
+        self.alpha_history_spin
+            .set_value(f64::from(s.chip_alpha_history) * 100.0);
         self.radius_spin.set_value(f64::from(s.border_radius));
         self.spacing_spin.set_value(f64::from(s.spacing));
         self.margin_x_spin.set_value(f64::from(s.margin_x));
@@ -472,6 +500,8 @@ impl SettingsWindow {
         self.lang_dropdown.set_selected(lang_index(d.language));
         self.position_dropdown.set_selected(position_index(d.position));
         self.alpha_spin.set_value(f64::from(d.chip_alpha) * 100.0);
+        self.alpha_history_spin
+            .set_value(f64::from(d.chip_alpha_history) * 100.0);
         self.radius_spin.set_value(f64::from(d.border_radius));
         self.spacing_spin.set_value(f64::from(d.spacing));
         self.margin_x_spin.set_value(f64::from(d.margin_x));

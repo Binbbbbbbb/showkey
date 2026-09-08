@@ -55,8 +55,10 @@ pub struct Settings {
     pub spacing: i32,
     /// 胶囊圆角半径（像素）。
     pub border_radius: u32,
-    /// 胶囊背景透明度，0.0（全透明）~ 1.0（不透明）。
+    /// 最新胶囊的背景透明度，0.0（全透明）~ 1.0（不透明）。
     pub chip_alpha: f32,
+    /// 历史胶囊（非最新）的背景透明度，0.0 ~ 1.0。
+    pub chip_alpha_history: f32,
 }
 
 impl Default for Settings {
@@ -73,6 +75,7 @@ impl Default for Settings {
             spacing: 8,
             border_radius: 18,
             chip_alpha: 0.85,
+            chip_alpha_history: 0.5,
         }
     }
 }

@@ -59,21 +59,34 @@ fn symbol_label(key: KeyCode) -> Option<(&'static str, &'static str)> {
 /// 特殊键 → Nerd Font 图标（`nf-md-*`）。
 fn icon_label(key: KeyCode) -> Option<&'static str> {
     Some(match key {
-        KeyCode::KEY_SPACE => "\u{F1050}", //     keyboard-space
-        KeyCode::KEY_ENTER => "\u{F0311}", //     keyboard-return
-        KeyCode::KEY_BACKSPACE => "\u{F0B5C}", // backspace（⌫，与 ← 区分）
-        KeyCode::KEY_TAB => "\u{F0312}", //       keyboard-tab
-        KeyCode::KEY_ESC => "\u{F12B7}", //       keyboard-esc
-        KeyCode::KEY_UP => "\u{F005D}", //        arrow-up
-        KeyCode::KEY_DOWN => "\u{F0045}", //      arrow-down
-        KeyCode::KEY_LEFT => "\u{F004D}", //      arrow-left
-        KeyCode::KEY_RIGHT => "\u{F0054}", //     arrow-right
-        KeyCode::KEY_HOME => "\u{F02DC}", //      home
-        KeyCode::KEY_END => "\u{F0794}", //       arrow-collapse-right
-        KeyCode::KEY_PAGEUP => "\u{F0BB2}", //    page-previous
-        KeyCode::KEY_PAGEDOWN => "\u{F0BB0}", //  page-next
-        KeyCode::KEY_DELETE => "\u{F01B4}", //    delete
-        KeyCode::KEY_CAPSLOCK => "\u{F030E}", //  keyboard-caps
+        KeyCode::KEY_SPACE => "\u{F1050}",      //     keyboard-space
+        KeyCode::KEY_ENTER => "\u{F0311}",      //     keyboard-return
+        KeyCode::KEY_BACKSPACE => "\u{F0B5C} ", // backspace（⌫，与 ← 区分）
+        KeyCode::KEY_TAB => "\u{F0312}",        //       keyboard-tab
+        KeyCode::KEY_ESC => "\u{F12B7}",        //       keyboard-esc
+        KeyCode::KEY_UP => "\u{F005D}",         //        arrow-up
+        KeyCode::KEY_DOWN => "\u{F0045}",       //      arrow-down
+        KeyCode::KEY_LEFT => "\u{F004D}",       //      arrow-left
+        KeyCode::KEY_RIGHT => "\u{F0054}",      //     arrow-right
+        KeyCode::KEY_HOME => "\u{F02DC}",       //      home
+        KeyCode::KEY_END => "\u{F0794}",        //       arrow-collapse-right
+        KeyCode::KEY_PAGEUP => "\u{F0BB2}",     //    page-previous
+        KeyCode::KEY_PAGEDOWN => "\u{F0BB0}",   //  page-next
+        KeyCode::KEY_DELETE => "\u{F01B4}",     //    delete
+        KeyCode::KEY_CAPSLOCK => "\u{F030E}",   //  keyboard-caps
+        // 媒体 / 亮度等常见快捷键
+        KeyCode::KEY_VOLUMEUP => "\u{F057E}", //        volume-high（音量增加）
+        KeyCode::KEY_VOLUMEDOWN => "\u{F057F}", //      volume-low（音量减少）
+        KeyCode::KEY_MUTE => "\u{F075F}",     //            volume-mute（静音）
+        KeyCode::KEY_PLAYPAUSE => "\u{F040E}", //       play-pause
+        KeyCode::KEY_STOPCD => "\u{F04DB}",   //          stop
+        KeyCode::KEY_NEXTSONG => "\u{F04AD}", //        skip-next（下一曲）
+        KeyCode::KEY_PREVIOUSSONG => "\u{F04AE}", //    skip-previous（上一曲）
+        KeyCode::KEY_FORWARD => "\u{F0211}",  //         fast-forward
+        KeyCode::KEY_BACK => "\u{F045F}",     //            rewind
+        KeyCode::KEY_BRIGHTNESSUP => "\u{F00E0}", //    brightness-7（亮度增加）
+        KeyCode::KEY_BRIGHTNESSDOWN => "\u{F00DD}", //  brightness-4（亮度减少）
+        KeyCode::KEY_EJECTCD => "\u{F01EA}",  //         eject（弹出）
         _ => return None,
     })
 }

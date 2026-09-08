@@ -10,6 +10,7 @@ use super::evdev::KeyInput;
 use super::keymap::{
     has_shift_variant, key_label, modifier_label, ALT_ICON, CTRL_ICON, SHIFT_ICON, SUPER_ICON,
 };
+use crate::display::Chip;
 
 /// 连续按键计数的超时时间：两次按下间隔超过它，`*N` 计数就重新开始。
 const RESET_TIMEOUT: Duration = Duration::from_secs(1);
@@ -67,7 +68,7 @@ impl ModifierState {
 /// - 中间插入其它键，或两次按下间隔超过 [`RESET_TIMEOUT`]，都会重新计数
 pub async fn report_keys(
     mut rx: mpsc::Receiver<KeyInput>,
-    ui_tx: std::sync::mpsc::Sender<String>,
+    ui_tx: std::sync::mpsc::Sender<Chip>,
 ) {
     let mut modifiers = ModifierState::default();
     let mut last_combo: Option<String> = None;
@@ -79,7 +80,7 @@ pub async fn report_keys(
         if let Some(icon) = modifier_label(key) {
             modifiers.update(key, pressed);
             if pressed {
-                let _ = ui_tx.send(icon.to_string());
+                let _ = ui_tx.send(Chip::key(icon.to_string()));
                 // 打断连续计数，避免之后的普通键与之前合并成 *N
                 last_combo = None;
             }
@@ -113,9 +114,9 @@ pub async fn report_keys(
         last_print = Some(Instant::now());
 
         if count == 1 {
-            let _ = ui_tx.send(combo.clone());
+            let _ = ui_tx.send(Chip::key(combo.clone()));
         } else {
-            let _ = ui_tx.send(format!("{combo} *{count}"));
+            let _ = ui_tx.send(Chip::key(format!("{combo} *{count}")));
         }
     }
 }
