@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 /// 明 / 暗两种外观。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Theme {
-    #[default]
     Light,
+    #[default]
     Dark,
 }
 
@@ -19,6 +19,16 @@ pub enum Language {
     #[default]
     Zh,
     En,
+}
+
+/// 悬浮层在屏幕上的锚定位置（贴哪两条边）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Position {
+    BottomLeft,
+    BottomRight,
+    TopLeft,
+    #[default]
+    TopRight,
 }
 
 /// 可调设置。所有字段都有默认值，反序列化时缺失的字段用默认补齐。
@@ -35,8 +45,12 @@ pub struct Settings {
     pub max_chips: usize,
     /// 每个胶囊的显示时长（毫秒）。
     pub display_duration_ms: u64,
-    /// 悬浮层与屏幕边缘的间距（像素）。
-    pub margin: i32,
+    /// 悬浮层在屏幕上的锚定位置。
+    pub position: Position,
+    /// 悬浮层与贴边水平方向的屏幕距离（像素）。
+    pub margin_x: i32,
+    /// 悬浮层与贴边垂直方向的屏幕距离（像素）。
+    pub margin_y: i32,
     /// 胶囊之间的间距（像素）。
     pub spacing: i32,
     /// 胶囊圆角半径（像素）。
@@ -48,12 +62,14 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            theme: Theme::Light,
+            theme: Theme::Dark,
             chip_theme: Theme::Dark,
             language: Language::Zh,
             max_chips: 5,
-            display_duration_ms: 2500,
-            margin: 24,
+            display_duration_ms: 2750,
+            position: Position::TopRight,
+            margin_x: 24,
+            margin_y: 24,
             spacing: 8,
             border_radius: 18,
             chip_alpha: 0.85,

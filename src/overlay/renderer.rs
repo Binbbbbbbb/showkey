@@ -5,7 +5,7 @@ use gtk::glib;
 use gtk::prelude::*;
 use gtk4_layer_shell::{Edge, LayerShell};
 
-use crate::config::{Settings, SettingsHandle, Theme};
+use crate::config::{Position, Settings, SettingsHandle, Theme};
 use super::wayland::build_window;
 
 /// 根据设置生成全局 CSS：透明窗口 + 胶囊样式。
@@ -83,14 +83,28 @@ impl Overlay {
         overlay
     }
 
-    /// 按当前设置重新应用胶囊样式（配色 / 圆角 / 透明度）与边距、间距。
+    /// 按当前设置重新应用胶囊样式（配色 / 圆角 / 透明度）、位置、边距与间距。
     pub fn apply_settings(&self) {
         let s = self.settings.read().unwrap();
         let css = build_css(&s);
         self.provider.load_from_data(&css);
         self.container.set_spacing(s.spacing);
-        self.window.set_margin(Edge::Bottom, s.margin);
-        self.window.set_margin(Edge::Left, s.margin);
+
+        // 根据位置决定贴哪两条边（水平 + 垂直），并应用对应两边的边距
+        let (h_edge, v_edge) = match s.position {
+            Position::BottomLeft => (Edge::Left, Edge::Bottom),
+            Position::BottomRight => (Edge::Right, Edge::Bottom),
+            Position::TopLeft => (Edge::Left, Edge::Top),
+            Position::TopRight => (Edge::Right, Edge::Top),
+        };
+        for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
+            self.window.set_anchor(edge, false);
+            self.window.set_margin(edge, 0);
+        }
+        self.window.set_anchor(h_edge, true);
+        self.window.set_anchor(v_edge, true);
+        self.window.set_margin(h_edge, s.margin_x);
+        self.window.set_margin(v_edge, s.margin_y);
     }
 
     /// 添加一个按键胶囊，最多 `max_chips` 个，每个独立 `display_duration` 后过期。

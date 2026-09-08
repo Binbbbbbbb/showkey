@@ -11,16 +11,17 @@ use gtk::glib;
 use gtk::prelude::*;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::config::{Language, Settings, SettingsHandle, Theme};
+use crate::config::{Language, Position, Settings, SettingsHandle, Theme};
 use crate::overlay::Overlay;
 
 /// 界面文案（中 / 英），`rows` 顺序与 `build` 里 add_row 的调用顺序一致。
 struct Strings {
     title: &'static str,
     sections: [&'static str; 4],
-    rows: [&'static str; 9],
+    rows: [&'static str; 11],
     light: &'static str,
     dark: &'static str,
+    positions: [&'static str; 4],
     reset: &'static str,
     save: &'static str,
 }
@@ -38,12 +39,15 @@ impl Strings {
                     "透明度 (%)",
                     "圆角 (px)",
                     "间距 (px)",
-                    "边距 (px)",
+                    "位置",
+                    "水平距离 (px)",
+                    "垂直距离 (px)",
                     "显示时长 (ms)",
                     "最大数量",
                 ],
                 light: "明亮",
                 dark: "黑暗",
+                positions: ["左下", "右下", "左上", "右上"],
                 reset: "重置",
                 save: "保存",
             },
@@ -57,12 +61,15 @@ impl Strings {
                     "Opacity (%)",
                     "Corner radius (px)",
                     "Spacing (px)",
-                    "Margin (px)",
+                    "Position",
+                    "Horizontal distance (px)",
+                    "Vertical distance (px)",
                     "Duration (ms)",
                     "Max chips",
                 ],
                 light: "Light",
                 dark: "Dark",
+                positions: ["Bottom-left", "Bottom-right", "Top-left", "Top-right"],
                 reset: "Reset",
                 save: "Save",
             },
@@ -194,6 +201,15 @@ fn lang_index(lang: Language) -> u32 {
     }
 }
 
+fn position_index(position: Position) -> u32 {
+    match position {
+        Position::BottomLeft => 0,
+        Position::BottomRight => 1,
+        Position::TopLeft => 2,
+        Position::TopRight => 3,
+    }
+}
+
 /// 设置窗口。控件变化只是草稿，点「保存」→ `commit` 才写回并生效。
 pub struct SettingsWindow {
     window: gtk::Window,
@@ -205,10 +221,12 @@ pub struct SettingsWindow {
     theme_dropdown: gtk::DropDown,
     chip_theme_dropdown: gtk::DropDown,
     lang_dropdown: gtk::DropDown,
+    position_dropdown: gtk::DropDown,
     alpha_spin: gtk::SpinButton,
     radius_spin: gtk::SpinButton,
     spacing_spin: gtk::SpinButton,
-    margin_spin: gtk::SpinButton,
+    margin_x_spin: gtk::SpinButton,
+    margin_y_spin: gtk::SpinButton,
     duration_spin: gtk::SpinButton,
     max_chips_spin: gtk::SpinButton,
     reset_button: gtk::Button,
@@ -256,14 +274,17 @@ impl SettingsWindow {
         chip_theme_dropdown.set_selected(theme_index(init.chip_theme));
         let lang_dropdown = gtk::DropDown::from_strings(&["中文", "English"]);
         lang_dropdown.set_selected(lang_index(init.language));
+        let position_dropdown = gtk::DropDown::from_strings(&strings.positions);
+        position_dropdown.set_selected(position_index(init.position));
 
         // 数字控件
         let alpha_spin = make_spin(f64::from(init.chip_alpha) * 100.0, 0.0, 100.0, 5.0);
         let radius_spin = make_spin(f64::from(init.border_radius), 0.0, 50.0, 1.0);
         let spacing_spin = make_spin(f64::from(init.spacing), 0.0, 100.0, 2.0);
-        let margin_spin = make_spin(f64::from(init.margin), 0.0, 200.0, 4.0);
+        let margin_x_spin = make_spin(f64::from(init.margin_x), 0.0, 200.0, 4.0);
+        let margin_y_spin = make_spin(f64::from(init.margin_y), 0.0, 200.0, 4.0);
         let duration_spin = make_spin(init.display_duration_ms as f64, 500.0, 10000.0, 250.0);
-        let max_chips_spin = make_spin(init.max_chips as f64, 1.0, 20.0, 1.0);
+        let max_chips_spin = make_spin(init.max_chips as f64, 1.0, 6.0, 1.0);
 
         // 布局：分组标题 + 行（rows 顺序见 Strings::rows）
         let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -297,11 +318,13 @@ impl SettingsWindow {
         row_labels.push(add_row(&root, strings.rows[5], &spacing_spin));
 
         section_headers.push(add_section(&root, strings.sections[2]));
-        row_labels.push(add_row(&root, strings.rows[6], &margin_spin));
+        row_labels.push(add_row(&root, strings.rows[6], &position_dropdown));
+        row_labels.push(add_row(&root, strings.rows[7], &margin_x_spin));
+        row_labels.push(add_row(&root, strings.rows[8], &margin_y_spin));
 
         section_headers.push(add_section(&root, strings.sections[3]));
-        row_labels.push(add_row(&root, strings.rows[7], &duration_spin));
-        row_labels.push(add_row(&root, strings.rows[8], &max_chips_spin));
+        row_labels.push(add_row(&root, strings.rows[9], &duration_spin));
+        row_labels.push(add_row(&root, strings.rows[10], &max_chips_spin));
 
         // 底部按钮：重置（改回默认，仅草稿）+ 保存（真正生效）
         let reset_button = gtk::Button::with_label(strings.reset);
@@ -331,10 +354,12 @@ impl SettingsWindow {
             theme_dropdown,
             chip_theme_dropdown,
             lang_dropdown,
+            position_dropdown,
             alpha_spin,
             radius_spin,
             spacing_spin,
-            margin_spin,
+            margin_x_spin,
+            margin_y_spin,
             duration_spin,
             max_chips_spin,
             reset_button,
@@ -360,8 +385,9 @@ impl SettingsWindow {
         sw
     }
 
-    /// 显示（置前）设置窗口。
+    /// 显示（置前）设置窗口，先同步控件到当前已保存的设置。
     pub fn show(&self) {
+        self.sync_from_settings();
         self.window.present();
     }
 
@@ -382,6 +408,12 @@ impl SettingsWindow {
         } else {
             Language::En
         };
+        let position = match self.position_dropdown.selected() {
+            0 => Position::BottomLeft,
+            1 => Position::BottomRight,
+            2 => Position::TopLeft,
+            _ => Position::TopRight,
+        };
 
         let (theme_changed, lang_changed) = {
             let mut s = self.settings.write().unwrap();
@@ -391,10 +423,12 @@ impl SettingsWindow {
             s.theme = theme;
             s.chip_theme = chip_theme;
             s.language = language;
+            s.position = position;
             s.chip_alpha = (self.alpha_spin.value() as f32) / 100.0;
             s.border_radius = self.radius_spin.value() as u32;
             s.spacing = self.spacing_spin.value() as i32;
-            s.margin = self.margin_spin.value() as i32;
+            s.margin_x = self.margin_x_spin.value() as i32;
+            s.margin_y = self.margin_y_spin.value() as i32;
             s.display_duration_ms = self.duration_spin.value() as u64;
             s.max_chips = self.max_chips_spin.value() as usize;
             s.save();
@@ -414,16 +448,34 @@ impl SettingsWindow {
         }
     }
 
+    /// 把控件刷新为当前已保存的设置值（丢弃未保存的草稿），打开窗口时调用。
+    fn sync_from_settings(&self) {
+        let s = self.settings.read().unwrap().clone();
+        self.theme_dropdown.set_selected(theme_index(s.theme));
+        self.chip_theme_dropdown.set_selected(theme_index(s.chip_theme));
+        self.lang_dropdown.set_selected(lang_index(s.language));
+        self.position_dropdown.set_selected(position_index(s.position));
+        self.alpha_spin.set_value(f64::from(s.chip_alpha) * 100.0);
+        self.radius_spin.set_value(f64::from(s.border_radius));
+        self.spacing_spin.set_value(f64::from(s.spacing));
+        self.margin_x_spin.set_value(f64::from(s.margin_x));
+        self.margin_y_spin.set_value(f64::from(s.margin_y));
+        self.duration_spin.set_value(s.display_duration_ms as f64);
+        self.max_chips_spin.set_value(s.max_chips as f64);
+    }
+
     /// 把控件改回默认值（只是草稿，仍需点「保存」才生效）。
     fn reset(&self) {
         let d = Settings::default();
         self.theme_dropdown.set_selected(theme_index(d.theme));
         self.chip_theme_dropdown.set_selected(theme_index(d.chip_theme));
         self.lang_dropdown.set_selected(lang_index(d.language));
+        self.position_dropdown.set_selected(position_index(d.position));
         self.alpha_spin.set_value(f64::from(d.chip_alpha) * 100.0);
         self.radius_spin.set_value(f64::from(d.border_radius));
         self.spacing_spin.set_value(f64::from(d.spacing));
-        self.margin_spin.set_value(f64::from(d.margin));
+        self.margin_x_spin.set_value(f64::from(d.margin_x));
+        self.margin_y_spin.set_value(f64::from(d.margin_y));
         self.duration_spin.set_value(d.display_duration_ms as f64);
         self.max_chips_spin.set_value(d.max_chips as f64);
     }
@@ -451,6 +503,7 @@ impl SettingsWindow {
         }
         set_dropdown_items(&self.theme_dropdown, &[s.light, s.dark]);
         set_dropdown_items(&self.chip_theme_dropdown, &[s.light, s.dark]);
+        set_dropdown_items(&self.position_dropdown, &s.positions);
         self.reset_button.set_label(s.reset);
         self.save_button.set_label(s.save);
     }
