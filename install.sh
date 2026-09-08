@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# showkey 一键打包安装脚本
+#
+# 用法：./install.sh
+# 做的事：编译 release → 装二进制到 ~/.local/bin/showkey → 装图标到
+#        $XDG_DATA_HOME/showkey/icon/（回退 ~/.local/share/showkey/icon/）。
+set -euo pipefail
+
+# 项目根目录（脚本所在目录）
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN_DIR="${HOME}/.local/bin"
+ICON_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/showkey/icon"
+
+echo "==> 编译 release 二进制…"
+cd "${PROJECT_DIR}"
+cargo build --release
+
+echo "==> 安装二进制 → ${BIN_DIR}/showkey"
+install -Dm755 "${PROJECT_DIR}/target/release/showkey" "${BIN_DIR}/showkey"
+
+echo "==> 安装图标 → ${ICON_DIR}/icon.svg"
+install -Dm644 "${PROJECT_DIR}/icon/icon.svg" "${ICON_DIR}/icon.svg"
+
+echo "==> 完成！现在可在终端直接运行：showkey"
+
+# 提示 PATH
+if [[ ":$PATH:" != *":${BIN_DIR}:"* ]]; then
+    echo "    注意：${BIN_DIR} 不在 PATH 中，请把它加入 PATH，例如："
+    echo '    export PATH="$HOME/.local/bin:$PATH"'
+fi

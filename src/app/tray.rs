@@ -4,6 +4,7 @@
 //! 基于 [`ksni`]（freedesktop StatusNotifierItem 的 Rust 实现，走 DBus）。图标直接用
 //! `icon/icon.svg`：quickshell 会按 `IconName` + `IconThemePath` 拼成文件路径加载。
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -36,7 +37,7 @@ impl Tray for ShowkeyTray {
     }
 
     fn icon_theme_path(&self) -> String {
-        format!("{}/icon", env!("CARGO_MANIFEST_DIR"))
+        icon_dir().to_string_lossy().into_owned()
     }
 
     /// 单击图标 → 打开设置窗口。
@@ -70,6 +71,22 @@ impl Tray for ShowkeyTray {
             .into(),
         ]
     }
+}
+
+/// 图标目录：优先用安装后的固定位置（`$XDG_DATA_HOME/showkey/icon`，回退
+/// `~/.local/share/showkey/icon`）；若还没安装，则回退源码目录（`cargo run` 开发场景）。
+fn icon_dir() -> PathBuf {
+    let data_home = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")));
+
+    if let Some(base) = data_home {
+        let installed = base.join("showkey").join("icon");
+        if installed.exists() {
+            return installed;
+        }
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("icon")
 }
 
 /// 在已有的 tokio runtime 里启动托盘，返回的 `Handle` 需保持存活。
