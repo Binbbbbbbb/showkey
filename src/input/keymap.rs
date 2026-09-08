@@ -61,7 +61,7 @@ fn icon_label(key: KeyCode) -> Option<&'static str> {
     Some(match key {
         KeyCode::KEY_SPACE => "\u{F1050}", //     keyboard-space
         KeyCode::KEY_ENTER => "\u{F0311}", //     keyboard-return
-        KeyCode::KEY_BACKSPACE => "\u{F030D}", // keyboard-backspace
+        KeyCode::KEY_BACKSPACE => "\u{F0B5C}", // backspace（⌫，与 ← 区分）
         KeyCode::KEY_TAB => "\u{F0312}", //       keyboard-tab
         KeyCode::KEY_ESC => "\u{F12B7}", //       keyboard-esc
         KeyCode::KEY_UP => "\u{F005D}", //        arrow-up

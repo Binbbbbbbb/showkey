@@ -63,7 +63,7 @@ impl ModifierState {
 ///
 /// - 修饰键按下时单独发图标
 /// - 普通键按下时，和当前按住的修饰键组合成 `⇧⌃K`（符号键按 Shift 切换字符）
-/// - 连续按同一个组合会合并成 `⌃K*2` 这种形式
+/// - 连续按同一个组合会合并成 `⌃K *2` 这种形式（图标与计数之间加空格，避免字形重叠）
 /// - 中间插入其它键，或两次按下间隔超过 [`RESET_TIMEOUT`]，都会重新计数
 pub async fn report_keys(
     mut rx: mpsc::Receiver<KeyInput>,
@@ -115,7 +115,7 @@ pub async fn report_keys(
         if count == 1 {
             let _ = ui_tx.send(combo.clone());
         } else {
-            let _ = ui_tx.send(format!("{combo}*{count}"));
+            let _ = ui_tx.send(format!("{combo} *{count}"));
         }
     }
 }
