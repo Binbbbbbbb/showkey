@@ -1,7 +1,7 @@
 //! 程序入口：读键盘，把组合键显示成 Wayland 悬浮胶囊。
 //!
-//! 结构：主线程跑 GTK 悬浮窗口；后台线程跑 tokio，读 evdev 事件并把
-//! 格式化好的显示字符串通过 channel 交给 UI 线程。
+//! 结构：主线程跑 GTK 悬浮窗口与设置窗口；后台线程跑 tokio，读 evdev 事件并把
+//! 格式化好的显示字符串通过 channel 交给 UI 线程，同时托管系统托盘图标。
 
 mod app;
 mod config;
@@ -9,13 +9,14 @@ mod input;
 mod overlay;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{mpsc, Arc, RwLock};
 use std::time::Duration;
 
 use gtk::glib;
 use gtk::prelude::*;
 use gtk4 as gtk;
 
+use config::{Settings, SettingsHandle};
 use overlay::Overlay;
 
 fn main() {
@@ -25,11 +26,25 @@ fn main() {
         std::process::exit(1);
     }
 
+    // 可调设置：从磁盘加载，跨线程共享（主线程读写，托盘菜单读语言）
+    let settings: SettingsHandle = Arc::new(RwLock::new(Settings::load()));
+
     // 后台线程 → UI 线程的显示字符串通道
     let (ui_tx, ui_rx) = mpsc::channel::<String>();
-    // 退出标志：托盘菜单点「退出」后置位，主循环检测到后退出
+    // 退出 / 显示设置标志：托盘置位，主循环轮询检测
     let quit = Arc::new(AtomicBool::new(false));
-    spawn_keyboard_thread(keyboards, ui_tx, quit.clone());
+    let show_settings = Arc::new(AtomicBool::new(false));
+    // 托盘菜单刷新通道（语言切换时刷新托盘菜单文案）
+    let (refresh_tx, refresh_rx) = tokio::sync::mpsc::unbounded_channel();
+
+    spawn_keyboard_thread(
+        keyboards,
+        ui_tx,
+        quit.clone(),
+        show_settings.clone(),
+        settings.clone(),
+        refresh_rx,
+    );
     let ui_rx = std::rc::Rc::new(ui_rx);
 
     let app = gtk::Application::builder()
@@ -38,14 +53,24 @@ fn main() {
 
     app.connect_activate(move |app| {
         let app = app.clone();
-        let overlay = std::rc::Rc::new(Overlay::build(&app));
+        let overlay = std::rc::Rc::new(Overlay::build(&app, settings.clone()));
+        let settings_window = app::settings_window::SettingsWindow::build(
+            &app,
+            settings.clone(),
+            overlay.clone(),
+            refresh_tx.clone(),
+        );
         let ui_rx = ui_rx.clone();
         let quit = quit.clone();
+        let show_settings = show_settings.clone();
 
-        // 主循环轮询 channel，把新的显示字符串变成胶囊；检测到退出标志则退出
+        // 主循环轮询 channel：把显示字符串变成胶囊；响应托盘请求；检测退出标志
         glib::timeout_add_local(Duration::from_millis(16), move || {
             while let Ok(text) = ui_rx.try_recv() {
                 overlay.push(&text);
+            }
+            if show_settings.swap(false, Ordering::SeqCst) {
+                settings_window.show();
             }
             if quit.load(Ordering::SeqCst) {
                 app.quit();
@@ -64,12 +89,15 @@ fn spawn_keyboard_thread(
     keyboards: Vec<evdev::Device>,
     ui_tx: mpsc::Sender<String>,
     quit: Arc<AtomicBool>,
+    show_settings: Arc<AtomicBool>,
+    settings: SettingsHandle,
+    refresh_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
 ) {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("创建 tokio runtime 失败");
         rt.block_on(async move {
             // 托盘图标（SNI）：保持 Handle 存活；失败只告警，不影响按键显示
-            let _tray = app::tray::run(quit).await;
+            let _tray = app::tray::run(quit, show_settings, settings, refresh_rx).await;
 
             let (ktx, krx) = tokio::sync::mpsc::channel(256);
 

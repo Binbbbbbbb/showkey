@@ -9,3 +9,5 @@ tokio = { version = "1.0", features = ["full"] }     # 异步运行时，用于�
 gtk4 = "0.11"                                        # GUI：悬浮窗口
 gtk4-layer-shell = "0.8"                             # Wayland layer-shell 悬浮层
 ksni = "0.3.6"
+serde = { version = "1", features = ["derive"] }      # 设置序列化
+toml = "0.8"                                          # 设置持久化格式
