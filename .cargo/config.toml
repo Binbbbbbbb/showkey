@@ -1,0 +1,4 @@
+# gtk4-layer-shell 系统开发库未全局安装，这里指向本地下载的开发库。
+# 若之后做了全局安装（sudo dnf install gtk4-layer-shell-devel），可删除本文件。
+[env]
+PKG_CONFIG_PATH = "/home/bbinn/.local/share/gtk4-layer-shell/lib/pkgconfig"
