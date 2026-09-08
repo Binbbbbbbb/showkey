@@ -2,7 +2,7 @@
 //! 右键菜单可显示设置 / 退出。
 //!
 //! 基于 [`ksni`]（freedesktop StatusNotifierItem 的 Rust 实现，走 DBus）。图标直接用
-//! `icon/icon.svg`：quickshell 会按 `IconName` + `IconThemePath` 拼成文件路径加载。
+//! `icon/showkey.svg`：quickshell 会按 `IconName` + `IconThemePath` 拼成文件路径加载。
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ impl Tray for ShowkeyTray {
 
     /// 带扩展名的文件名：quickshell 会把它拼到 `icon_theme_path` 下按路径加载。
     fn icon_name(&self) -> String {
-        "icon.svg".into()
+        "showkey.svg".into()
     }
 
     fn icon_theme_path(&self) -> String {
