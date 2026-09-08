@@ -21,7 +21,7 @@ use input::{Event, Libinput, LibinputInterface};
 
 use crate::display::{Accent, Chip};
 
-use super::keymap::SUPER_ICON;
+use super::keymap::{COMBO_SEP, SUPER_ICON};
 
 /// 双击判定窗口。
 const DOUBLE_CLICK_WINDOW: Duration = Duration::from_millis(300);
@@ -197,17 +197,11 @@ fn swipe_chip(fingers: u32, dx: f64, dy: f64) -> Option<Chip> {
                 "U" // 上滑
             }
         }
-        4 => {
-            // 四指只有上滑
-            if dy < 0.0 && dy.abs() >= dx.abs() {
-                "D"
-            } else {
-                return None;
-            }
-        }
+        // 四指只有上滑
+        4 if dy < 0.0 && dy.abs() >= dx.abs() => "D",
         _ => return None,
     };
-    Some(Chip::key(format!("{SUPER_ICON} + {letter}")))
+    Some(Chip::key(format!("{SUPER_ICON}{COMBO_SEP}{letter}")))
 }
 
 /// 在独立线程里跑 libinput 事件循环，把点击 / 滚轮 / 手势发到 `ui_tx`。
@@ -252,10 +246,10 @@ pub fn run_pointer_listener(ui_tx: mpsc::Sender<Chip>) {
         }
 
         // 滚动静止后结算成单个胶囊
-        if let Some(chip) = state.flush_scroll() {
-            if ui_tx.send(chip).is_err() {
-                return;
-            }
+        if let Some(chip) = state.flush_scroll()
+            && ui_tx.send(chip).is_err()
+        {
+            return;
         }
     }
 }

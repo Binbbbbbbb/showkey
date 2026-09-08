@@ -17,6 +17,9 @@ pub const SHIFT_ICON: &str = "\u{F0636}";
 pub const ALT_ICON: &str = "\u{F0635}";
 pub const SUPER_ICON: &str = "\u{F0633}";
 
+/// 组合键中修饰键与按键之间的分隔符（如 `⌘ + H`）。
+pub const COMBO_SEP: &str = " + ";
+
 /// 修饰键 → 显示图标。非修饰键返回 `None`。
 pub fn modifier_label(key: KeyCode) -> Option<&'static str> {
     Some(match key {

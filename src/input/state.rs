@@ -8,7 +8,8 @@ use tokio::sync::mpsc;
 
 use super::evdev::KeyInput;
 use super::keymap::{
-    has_shift_variant, key_label, modifier_label, ALT_ICON, CTRL_ICON, SHIFT_ICON, SUPER_ICON,
+    has_shift_variant, key_label, modifier_label, ALT_ICON, COMBO_SEP, CTRL_ICON, SHIFT_ICON,
+    SUPER_ICON,
 };
 use crate::display::Chip;
 
@@ -101,10 +102,10 @@ pub async fn report_keys(
 
         let mut parts: Vec<String> = mods.into_iter().map(str::to_string).collect();
         parts.push(key_label(key, shift));
-        let combo = parts.join(" + ");
+        let combo = parts.join(COMBO_SEP);
 
         // 只有「同一个组合」且「没超时」才累加计数，否则重新从 1 开始
-        let timed_out = last_print.map_or(true, |t| t.elapsed() >= RESET_TIMEOUT);
+        let timed_out = last_print.is_none_or(|t| t.elapsed() >= RESET_TIMEOUT);
         if !timed_out && last_combo.as_deref() == Some(combo.as_str()) {
             count += 1;
         } else {
