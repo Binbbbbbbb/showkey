@@ -11,6 +11,8 @@
 
 use evdev::KeyCode;
 
+use crate::config::Hotkey;
+
 /// 修饰键的显示图标（`nf-md-apple_keyboard_*`）。
 pub const CTRL_ICON: &str = "\u{F0634}";
 pub const SHIFT_ICON: &str = "\u{F0636}";
@@ -114,4 +116,23 @@ pub fn key_label(key: KeyCode, shift: bool) -> String {
 
     let debug = format!("{key:?}");
     debug.strip_prefix("KEY_").unwrap_or(&debug).to_string()
+}
+
+/// 把快捷键组合渲染成显示字符串（修饰键图标 + 按键），如 `⌃⌥ + P`。
+pub fn hotkey_label(hotkey: &Hotkey) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if hotkey.ctrl {
+        parts.push(CTRL_ICON.to_string());
+    }
+    if hotkey.shift {
+        parts.push(SHIFT_ICON.to_string());
+    }
+    if hotkey.alt {
+        parts.push(ALT_ICON.to_string());
+    }
+    if hotkey.super_key {
+        parts.push(SUPER_ICON.to_string());
+    }
+    parts.push(key_label(KeyCode::new(hotkey.key), false));
+    parts.join(COMBO_SEP)
 }

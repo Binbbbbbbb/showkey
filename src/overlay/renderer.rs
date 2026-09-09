@@ -14,8 +14,7 @@ use super::wayland::build_window;
 /// 单个胶囊的最小宽度（像素）：满载时窗口宽度 = 最小宽度 × 最大胶囊数。
 const MIN_CHIP_WIDTH: i32 = 72;
 
-/// 胶囊淡入 / 淡出的时长与步数。
-const FADE_DURATION: Duration = Duration::from_millis(150);
+/// 淡入 / 淡出的步数（步进间隔由设置的 `fade_duration` 决定）。
 const FADE_STEPS: u32 = 16;
 
 /// 根据设置生成全局 CSS：透明窗口 + 胶囊样式。
@@ -58,7 +57,7 @@ window {{
     border-radius: {radius}px;
     padding: 12px 24px;
     font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
-    font-size: 20px;
+    font-size: {font_size}px;
     font-weight: bold;
 }}
 .key-chip {{
@@ -81,6 +80,7 @@ window {{
         middle = middle,
         scroll = scroll,
         radius = s.border_radius,
+        font_size = s.font_size,
     )
 }
 
@@ -96,12 +96,19 @@ fn accent_class(accent: Accent) -> &'static str {
 
 /// 让 `widget` 的透明度从 `from` 渐变到 `to`，完成后执行 `done`。
 ///
-/// 用固定间隔计时器分 [`FADE_STEPS`] 步推进，只改 widget 的 `opacity` 属性，
-/// 不影响 CSS 里定义的背景透明度（胶囊底色仍是 `chip_alpha` / `chip_alpha_history`）。
-fn fade(widget: gtk::Widget, from: f64, to: f64, done: impl FnOnce() + 'static) {
+/// 用固定间隔计时器分 [`FADE_STEPS`] 步推进，`duration` 为总过渡时长；只改 widget 的
+/// `opacity` 属性，不影响 CSS 里定义的背景透明度（胶囊底色仍是 `chip_alpha` / `chip_alpha_history`）。
+fn fade(
+    widget: gtk::Widget,
+    from: f64,
+    to: f64,
+    duration: Duration,
+    done: impl FnOnce() + 'static,
+) {
     widget.set_opacity(from);
     let step = (to - from) / f64::from(FADE_STEPS);
-    let interval = FADE_DURATION / FADE_STEPS;
+    // 步进间隔至少 1ms，避免设置成 0 时退化成忙轮询
+    let interval = (duration / FADE_STEPS).max(Duration::from_millis(1));
     let mut done = Some(done);
     let mut i = 0u32;
     glib::timeout_add_local(interval, move || {
@@ -120,14 +127,14 @@ fn fade(widget: gtk::Widget, from: f64, to: f64, done: impl FnOnce() + 'static) 
 }
 
 /// 淡入：从全透明渐变到不透明。
-fn fade_in(widget: gtk::Widget) {
-    fade(widget, 0.0, 1.0, || {});
+fn fade_in(widget: gtk::Widget, duration: Duration) {
+    fade(widget, 0.0, 1.0, duration, || {});
 }
 
 /// 淡出：从当前透明度渐变到全透明，完成后执行 `done`（通常是移除胶囊）。
-fn fade_out(widget: gtk::Widget, done: impl FnOnce() + 'static) {
+fn fade_out(widget: gtk::Widget, duration: Duration, done: impl FnOnce() + 'static) {
     let from = widget.opacity();
-    fade(widget, from, 0.0, done);
+    fade(widget, from, 0.0, duration, done);
 }
 
 /// 悬浮窗口，内部管理一排按键胶囊。
@@ -165,7 +172,7 @@ impl Overlay {
         overlay
     }
 
-    /// 按当前设置重新应用胶囊样式（配色 / 圆角 / 透明度）、位置、边距与间距。
+    /// 按当前设置重新应用胶囊样式（配色 / 圆角 / 透明度 / 字体）、位置、边距与间距。
     pub fn apply_settings(&self) {
         let s = self.settings.read().unwrap();
         let css = build_css(&s);
@@ -195,9 +202,9 @@ impl Overlay {
 
     /// 添加一个胶囊，最多 `max_chips` 个，每个独立 `display_duration` 后过期。
     pub fn push(&self, chip: &Chip) {
-        let (max_chips, duration) = {
+        let (max_chips, duration, fade_duration) = {
             let s = self.settings.read().unwrap();
-            (s.max_chips, s.display_duration())
+            (s.max_chips, s.display_duration(), s.fade_duration())
         };
 
         // 新胶囊是最新的：先把上一个最新的胶囊降级为历史样式（透明度不同）
@@ -225,7 +232,7 @@ impl Overlay {
 
         // 有胶囊就确保窗口可见，并淡入新胶囊
         self.window.set_visible(true);
-        fade_in(label.clone().upcast());
+        fade_in(label.clone().upcast(), fade_duration);
 
         // 每个胶囊独立计时，到点先淡出再移除；若清空则隐藏窗口，
         // 强制 layer-shell 表面重新映射，避免最后一枚胶囊的画面残留。
@@ -236,7 +243,7 @@ impl Overlay {
             if label.parent().is_none() {
                 return;
             }
-            fade_out(label.clone().upcast(), move || {
+            fade_out(label.clone().upcast(), fade_duration, move || {
                 if label.parent().is_some() {
                     container.remove(&label);
                 }

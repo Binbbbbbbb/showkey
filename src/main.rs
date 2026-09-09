@@ -5,6 +5,7 @@
 
 mod app;
 mod config;
+mod control;
 mod display;
 mod input;
 mod overlay;
@@ -36,6 +37,8 @@ fn main() {
     // 退出 / 显示设置标志：托盘置位，主循环轮询检测
     let quit = Arc::new(AtomicBool::new(false));
     let show_settings = Arc::new(AtomicBool::new(false));
+    // 暂停显示 + 快捷键录制的共享控制状态
+    let pause_ctl = Arc::new(control::PauseControl::new());
     // 托盘菜单刷新通道（语言切换时刷新托盘菜单文案）
     let (refresh_tx, refresh_rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -46,6 +49,7 @@ fn main() {
         show_settings.clone(),
         settings.clone(),
         refresh_rx,
+        pause_ctl.clone(),
     );
     // 指针（鼠标 / 触控板）用 libinput，独立线程阻塞循环
     spawn_pointer_thread(ui_tx);
@@ -63,15 +67,20 @@ fn main() {
             settings.clone(),
             overlay.clone(),
             refresh_tx.clone(),
+            pause_ctl.clone(),
         );
         let ui_rx = ui_rx.clone();
         let quit = quit.clone();
         let show_settings = show_settings.clone();
+        let pause_ctl = pause_ctl.clone();
 
         // 主循环轮询 channel：把显示消息变成胶囊；响应托盘请求；检测退出标志
         glib::timeout_add_local(Duration::from_millis(16), move || {
             while let Ok(chip) = ui_rx.try_recv() {
-                overlay.push(&chip);
+                // 暂停时丢弃新胶囊（保留已经显示的，它们会自行淡出）
+                if !pause_ctl.paused.load(Ordering::SeqCst) {
+                    overlay.push(&chip);
+                }
             }
             if show_settings.swap(false, Ordering::SeqCst) {
                 settings_window.show();
@@ -96,12 +105,13 @@ fn spawn_keyboard_thread(
     show_settings: Arc<AtomicBool>,
     settings: SettingsHandle,
     refresh_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
+    pause_ctl: Arc<control::PauseControl>,
 ) {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("创建 tokio runtime 失败");
         rt.block_on(async move {
             // 托盘图标（SNI）：保持 Handle 存活；失败只告警，不影响按键显示
-            let _tray = app::tray::run(quit, show_settings, settings, refresh_rx).await;
+            let _tray = app::tray::run(quit, show_settings, settings.clone(), refresh_rx).await;
 
             // 键盘：事件先交给状态合并（组合键 / 修饰键）
             let (ktx, krx) = tokio::sync::mpsc::channel(256);
@@ -113,7 +123,7 @@ fn spawn_keyboard_thread(
             // 释放最后一个 sender：所有键盘断开后 channel 关闭，report 任务随之退出
             drop(ktx);
 
-            input::report_keys(krx, ui_tx).await;
+            input::report_keys(krx, ui_tx, settings, pause_ctl).await;
         });
     });
 }

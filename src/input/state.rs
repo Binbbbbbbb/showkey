@@ -1,6 +1,8 @@
 //! 按键状态管理：跟踪 Ctrl / Shift / Alt / Super 的按下状态，并把
 //! 「修饰键图标 + 按键」组合成 `⇧⌃K` 这种显示字符串。
 
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use evdev::KeyCode;
@@ -11,6 +13,8 @@ use super::keymap::{
     has_shift_variant, key_label, modifier_label, ALT_ICON, COMBO_SEP, CTRL_ICON, SHIFT_ICON,
     SUPER_ICON,
 };
+use crate::config::{Hotkey, SettingsHandle};
+use crate::control::PauseControl;
 use crate::display::Chip;
 
 /// 连续按键计数的超时时间：两次按下间隔超过它，`*N` 计数就重新开始。
@@ -59,6 +63,15 @@ impl ModifierState {
         }
         list
     }
+
+    /// 当前按住的修饰键 + 给定按键是否恰好等于 `hotkey`（用于暂停快捷键判定）。
+    pub fn matches_hotkey(&self, hotkey: &Hotkey, key: KeyCode) -> bool {
+        self.ctrl == hotkey.ctrl
+            && self.shift == hotkey.shift
+            && self.alt == hotkey.alt
+            && self.super_key == hotkey.super_key
+            && key.code() == hotkey.key
+    }
 }
 
 /// 消费按键事件，跟踪修饰键状态并把显示字符串发到 `ui_tx`。
@@ -67,9 +80,12 @@ impl ModifierState {
 /// - 普通键按下时，和当前按住的修饰键组合成 `⇧⌃K`（符号键按 Shift 切换字符）
 /// - 连续按同一个组合会合并成 `⌃K *2` 这种形式（图标与计数之间加空格，避免字形重叠）
 /// - 中间插入其它键，或两次按下间隔超过 [`RESET_TIMEOUT`]，都会重新计数
+/// - 录制模式下捕获下一个组合存入 `captured`；按暂停快捷键会翻转 `paused` 而不显示
 pub async fn report_keys(
     mut rx: mpsc::Receiver<KeyInput>,
     ui_tx: std::sync::mpsc::Sender<Chip>,
+    settings: SettingsHandle,
+    pause_ctl: Arc<PauseControl>,
 ) {
     let mut modifiers = ModifierState::default();
     let mut last_combo: Option<String> = None;
@@ -89,6 +105,29 @@ pub async fn report_keys(
         }
         // 普通键：只关心按下
         if !pressed {
+            continue;
+        }
+
+        // 录制模式：把当前「修饰键 + 按键」作为快捷键捕获，不显示
+        if pause_ctl.capture.load(Ordering::SeqCst) {
+            let hotkey = Hotkey {
+                ctrl: modifiers.ctrl,
+                shift: modifiers.shift,
+                alt: modifiers.alt,
+                super_key: modifiers.super_key,
+                key: key.code(),
+            };
+            *pause_ctl.captured.lock().unwrap() = Some(hotkey);
+            pause_ctl.capture.store(false, Ordering::SeqCst);
+            last_combo = None;
+            continue;
+        }
+
+        // 暂停快捷键：翻转暂停状态，不显示该组合
+        let hotkey = settings.read().unwrap().pause_hotkey;
+        if modifiers.matches_hotkey(&hotkey, key) {
+            pause_ctl.paused.fetch_xor(true, Ordering::SeqCst);
+            last_combo = None;
             continue;
         }
 

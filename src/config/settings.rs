@@ -31,6 +31,31 @@ pub enum Position {
     TopRight,
 }
 
+/// 暂停显示的快捷键组合。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Hotkey {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub super_key: bool,
+    /// 触发键的 Linux evdev 键码（`evdev::KeyCode::code()`）。
+    pub key: u16,
+}
+
+impl Default for Hotkey {
+    fn default() -> Self {
+        // Ctrl + Alt + P（KEY_P = 25）
+        Self {
+            ctrl: true,
+            shift: false,
+            alt: true,
+            super_key: false,
+            key: 25,
+        }
+    }
+}
+
 /// 可调设置。所有字段都有默认值，反序列化时缺失的字段用默认补齐。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -59,6 +84,26 @@ pub struct Settings {
     pub chip_alpha: f32,
     /// 历史胶囊（非最新）的背景透明度，0.0 ~ 1.0。
     pub chip_alpha_history: f32,
+    /// 胶囊字体大小（像素）。
+    #[serde(default = "default_font_size")]
+    pub font_size: u32,
+    /// 胶囊淡入 / 淡出的过渡时长（毫秒）。
+    #[serde(default = "default_fade_duration_ms")]
+    pub fade_duration_ms: u64,
+    /// 暂停显示的快捷键组合。
+    pub pause_hotkey: Hotkey,
+    /// 是否开机自启（写入 `~/.config/autostart/showkey.desktop`）。
+    pub autostart: bool,
+}
+
+/// 缺失字段时字体大小的默认值（20px）。
+fn default_font_size() -> u32 {
+    20
+}
+
+/// 缺失字段时淡入淡出时长的默认值（150ms）。
+fn default_fade_duration_ms() -> u64 {
+    150
 }
 
 impl Default for Settings {
@@ -76,6 +121,10 @@ impl Default for Settings {
             border_radius: 18,
             chip_alpha: 0.85,
             chip_alpha_history: 0.5,
+            font_size: 20,
+            fade_duration_ms: 150,
+            pause_hotkey: Hotkey::default(),
+            autostart: false,
         }
     }
 }
@@ -84,6 +133,11 @@ impl Settings {
     /// 每个胶囊的显示时长，转成 [`Duration`] 方便计时器使用。
     pub fn display_duration(&self) -> Duration {
         Duration::from_millis(self.display_duration_ms)
+    }
+
+    /// 胶囊淡入 / 淡出的过渡时长，转成 [`Duration`] 方便计时器使用。
+    pub fn fade_duration(&self) -> Duration {
+        Duration::from_millis(self.fade_duration_ms)
     }
 
     /// 配置文件路径：`$XDG_CONFIG_HOME/showkey/config.toml`（回退 `~/.config/showkey/config.toml`）。
