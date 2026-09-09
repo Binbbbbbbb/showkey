@@ -8,7 +8,7 @@ use gtk::prelude::*;
 use gtk4_layer_shell::{Edge, LayerShell};
 
 use crate::config::{Position, Settings, SettingsHandle, Theme};
-use crate::display::{Accent, Chip};
+use crate::core::{Accent, Chip};
 use super::wayland::build_window;
 
 /// 单个胶囊的最小宽度（像素）：满载时窗口宽度 = 最小宽度 × 最大胶囊数。

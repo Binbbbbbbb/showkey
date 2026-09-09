@@ -5,8 +5,7 @@
 
 mod app;
 mod config;
-mod control;
-mod display;
+mod core;
 mod input;
 mod overlay;
 
@@ -19,7 +18,7 @@ use gtk::prelude::*;
 use gtk4 as gtk;
 
 use config::{Settings, SettingsHandle};
-use display::Chip;
+use core::Chip;
 use overlay::Overlay;
 
 fn main() {
@@ -38,7 +37,7 @@ fn main() {
     let quit = Arc::new(AtomicBool::new(false));
     let show_settings = Arc::new(AtomicBool::new(false));
     // 暂停显示 + 快捷键录制的共享控制状态
-    let pause_ctl = Arc::new(control::PauseControl::new());
+    let pause_ctl = Arc::new(core::PauseControl::new());
     // 托盘菜单刷新通道（语言切换时刷新托盘菜单文案）
     let (refresh_tx, refresh_rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -105,7 +104,7 @@ fn spawn_keyboard_thread(
     show_settings: Arc<AtomicBool>,
     settings: SettingsHandle,
     refresh_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
-    pause_ctl: Arc<control::PauseControl>,
+    pause_ctl: Arc<core::PauseControl>,
 ) {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("创建 tokio runtime 失败");

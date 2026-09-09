@@ -3,6 +3,13 @@
 //! 这是普通 `gtk::Window`（非 layer-shell），能正常获得键盘焦点。控件改动**实时生效**：
 //! 每改一项就写回共享设置、持久化并热更新悬浮层 / 主题 / 文案。「重置」把全部设置
 //! 改回默认值。
+//!
+//! 目录模块：主窗口逻辑在本文件；界面文案 / 主题 CSS / 行控件构造分见
+//! [`strings`] / [`theme`] / [`widgets`]。
+
+mod strings;
+mod theme;
+mod widgets;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -16,228 +23,16 @@ use gtk::prelude::*;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::config::{Hotkey, Language, Position, Settings, SettingsHandle, Theme};
-use crate::control::PauseControl;
+use crate::core::PauseControl;
 use crate::input::keymap::hotkey_label;
 use crate::overlay::Overlay;
 
-/// 界面文案（中 / 英），`rows` 顺序与 `build` 里 add_row 的调用顺序一致。
-struct Strings {
-    title: &'static str,
-    sections: [&'static str; 4],
-    rows: [&'static str; 16],
-    light: &'static str,
-    dark: &'static str,
-    positions: [&'static str; 4],
-    reset: &'static str,
-    done: &'static str,
-    record_hint: &'static str,
-}
-
-impl Strings {
-    fn for_lang(lang: Language) -> Self {
-        match lang {
-            Language::Zh => Self {
-                title: "设置",
-                sections: ["外观", "胶囊", "布局", "行为"],
-                rows: [
-                    "界面主题",
-                    "胶囊配色",
-                    "语言",
-                    "最新透明度 (%)",
-                    "历史透明度 (%)",
-                    "圆角 (px)",
-                    "间距 (px)",
-                    "字体大小 (px)",
-                    "位置",
-                    "水平距离 (px)",
-                    "垂直距离 (px)",
-                    "显示时长 (ms)",
-                    "最大数量",
-                    "消失动画时长 (ms)",
-                    "暂停快捷键",
-                    "开机自启",
-                ],
-                light: "明亮",
-                dark: "黑暗",
-                positions: ["左下", "右下", "左上", "右上"],
-                reset: "重置",
-                done: "完成",
-                record_hint: "请按下组合键…",
-            },
-            Language::En => Self {
-                title: "Settings",
-                sections: ["Appearance", "Chips", "Layout", "Behavior"],
-                rows: [
-                    "Theme",
-                    "Chip color",
-                    "Language",
-                    "Latest opacity (%)",
-                    "History opacity (%)",
-                    "Corner radius (px)",
-                    "Spacing (px)",
-                    "Font size (px)",
-                    "Position",
-                    "Horizontal distance (px)",
-                    "Vertical distance (px)",
-                    "Duration (ms)",
-                    "Max chips",
-                    "Fade duration (ms)",
-                    "Pause hotkey",
-                    "Autostart",
-                ],
-                light: "Light",
-                dark: "Dark",
-                positions: ["Bottom-left", "Bottom-right", "Top-left", "Top-right"],
-                reset: "Reset",
-                done: "Done",
-                record_hint: "Press a combo…",
-            },
-        }
-    }
-}
-
-/// 设置窗口自身的 CSS：按主题生成明 / 暗两套简洁调色板，含右上角关闭按钮。
-fn window_css(theme: Theme) -> String {
-    let (bg, fg, muted, sep, close_bg, close_fg, close_hover) = match theme {
-        // 关闭按钮：暗色 = 浅一点的黑色；亮色 = 浅一点的白色（略灰，稍微可见但不突兀）
-        Theme::Light => (
-            "#f5f5f7",
-            "#1d1d1f",
-            "#86868b",
-            "rgba(0, 0, 0, 0.08)",
-            "#e2e2e5",
-            "#1d1d1f",
-            "#d2d2d6",
-        ),
-        Theme::Dark => (
-            "#1c1c1e",
-            "#f5f5f7",
-            "#98989d",
-            "rgba(255, 255, 255, 0.10)",
-            "#333336",
-            "#f5f5f7",
-            "#454549",
-        ),
-    };
-    format!(
-        r#"
-.settings-window {{
-    background-color: {bg};
-    color: {fg};
-}}
-.settings-root {{
-    background-color: {bg};
-    padding: 12px 20px 20px 20px;
-}}
-.section-header {{
-    color: {muted};
-    font-size: 12px;
-    font-weight: 600;
-    margin-top: 20px;
-    margin-bottom: 4px;
-}}
-.settings-row {{
-    padding: 9px 0;
-    border-bottom: 1px solid {sep};
-}}
-.row-label {{
-    font-size: 14px;
-}}
-.close-button {{
-    min-width: 26px;
-    min-height: 26px;
-    border-radius: 13px;
-    padding: 0;
-    font-size: 12px;
-    font-weight: bold;
-    border: none;
-    box-shadow: none;
-    background-image: none;
-    background-color: {close_bg};
-    color: {close_fg};
-}}
-.close-button:hover {{
-    background-color: {close_hover};
-}}
-"#,
-        bg = bg,
-        fg = fg,
-        muted = muted,
-        sep = sep,
-        close_bg = close_bg,
-        close_fg = close_fg,
-        close_hover = close_hover,
-    )
-}
-
-/// 屏幕工作区高度（像素），用于限制设置窗口最大高度为屏幕的 60%。取不到就回退 900。
-fn screen_workarea_height() -> i32 {
-    gtk::gdk::Display::default()
-        .and_then(|d| d.monitors().item(0))
-        .and_then(|m| m.downcast::<gtk::gdk::Monitor>().ok())
-        .map(|m| m.geometry().height())
-        .unwrap_or(900)
-}
-
-/// 整数取值用的 `SpinButton`。
-fn make_spin(value: f64, lower: f64, upper: f64, step: f64) -> gtk::SpinButton {
-    let adj = gtk::Adjustment::new(value, lower, upper, step, step * 10.0, 0.0);
-    gtk::SpinButton::new(Some(&adj), 1.0, 0)
-}
-
-/// 追加一个分组标题，返回该 label（供语言切换刷新文案）。
-fn add_section(parent: &gtk::Box, title: &str) -> gtk::Label {
-    let label = gtk::Label::new(Some(title));
-    label.add_css_class("section-header");
-    label.set_halign(gtk::Align::Start);
-    parent.append(&label);
-    label
-}
-
-/// 追加一行「左 label + 右控件」，返回该 label（供语言切换刷新文案）。
-fn add_row(parent: &gtk::Box, title: &str, control: &impl IsA<gtk::Widget>) -> gtk::Label {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    row.add_css_class("settings-row");
-    let label = gtk::Label::new(Some(title));
-    label.add_css_class("row-label");
-    label.set_halign(gtk::Align::Start);
-    label.set_hexpand(true);
-    row.append(&label);
-    row.append(control);
-    parent.append(&row);
-    label
-}
-
-/// 重建下拉条目文本（保持当前选中项）。
-fn set_dropdown_items(dropdown: &gtk::DropDown, items: &[&str]) {
-    let selected = dropdown.selected();
-    let model = gtk::StringList::new(items);
-    dropdown.set_model(Some(&model));
-    dropdown.set_selected(selected);
-}
-
-fn theme_index(theme: Theme) -> u32 {
-    match theme {
-        Theme::Light => 0,
-        Theme::Dark => 1,
-    }
-}
-
-fn lang_index(lang: Language) -> u32 {
-    match lang {
-        Language::Zh => 0,
-        Language::En => 1,
-    }
-}
-
-fn position_index(position: Position) -> u32 {
-    match position {
-        Position::BottomLeft => 0,
-        Position::BottomRight => 1,
-        Position::TopLeft => 2,
-        Position::TopRight => 3,
-    }
-}
+use strings::Strings;
+use theme::window_css;
+use widgets::{
+    add_row, add_section, lang_index, make_spin, position_index, screen_workarea_height,
+    set_dropdown_items, theme_index,
+};
 
 /// 设置窗口。控件变化实时生效。
 pub struct SettingsWindow {

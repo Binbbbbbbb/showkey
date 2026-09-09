@@ -14,8 +14,7 @@ use super::keymap::{
     SUPER_ICON,
 };
 use crate::config::{Hotkey, SettingsHandle};
-use crate::control::PauseControl;
-use crate::display::Chip;
+use crate::core::{Chip, PauseControl};
 
 /// 连续按键计数的超时时间：两次按下间隔超过它，`*N` 计数就重新开始。
 const RESET_TIMEOUT: Duration = Duration::from_secs(1);

@@ -19,7 +19,7 @@ use input::event::pointer::{Axis, ButtonState, PointerEvent, PointerScrollEvent}
 use input::event::EventTrait;
 use input::{Event, Libinput, LibinputInterface};
 
-use crate::display::{Accent, Chip};
+use crate::core::{Accent, Chip};
 
 use super::keymap::{COMBO_SEP, SUPER_ICON};
 
