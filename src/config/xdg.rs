@@ -15,6 +15,17 @@ pub fn data_dir() -> Option<PathBuf> {
     xdg_dir("XDG_DATA_HOME", ".local/share")
 }
 
+/// `$XDG_RUNTIME_DIR`（回退系统临时目录）。
+///
+/// 用于存放只在本次登录期间需要的临时文件（如内置字体的落盘副本）。这个变量按规范
+/// 没有「主目录」形式的回退，所以拿不到时退到临时目录。
+pub fn runtime_dir() -> PathBuf {
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+}
+
 /// 取 `$var` 的值，未设置时回退 `~/fallback`。
 ///
 /// 规范要求把「已设置但为空」视同未设置：否则 `PathBuf::from("")` 会拼出相对路径，

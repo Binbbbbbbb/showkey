@@ -62,6 +62,8 @@ window {{
     border: 1px solid {border};
     border-radius: {radius}px;
     padding: 12px 24px;
+    /* 首项是编译进二进制的内置字体（见 crate::app::font::FAMILY，改名要同步改那边），
+       后两项是装了系统 Nerd Font / JetBrains Mono 时的回退 */
     font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
     font-size: {font_size}px;
     font-weight: bold;

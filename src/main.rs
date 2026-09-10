@@ -28,6 +28,10 @@ fn main() {
         std::process::exit(1);
     }
 
+    // 注册内置的 Nerd Font（编译进二进制），没装 Nerd Font 的机器也能显示图标。
+    // 必须在任何字体被解析之前调用。
+    app::font::register();
+
     // 可调设置：从磁盘加载，跨线程共享（主线程读写，托盘菜单读语言）
     let settings: SettingsHandle = Arc::new(RwLock::new(Settings::load()));
 

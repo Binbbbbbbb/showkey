@@ -20,6 +20,7 @@ showkey 运行在 Wayland 的 layer-shell 悬浮层上，直接读取输入设�
 - 🖲️ **触控板**：轻点（1/2/3 指 → 左/右/中键）、双指滚动、三/四指滑动 → 对应按键组合
 - 🎨 **高度可定制**：主题、胶囊配色、透明度、圆角、字体大小、位置、间距、边距、显示时长、淡入淡出时长、最大数量
 - 🌐 **中英文界面**
+- 📦 **图标字体内置**：编译进二进制，无需安装 Nerd Font
 - 🧰 **系统托盘图标**（单击开设置，右键菜单）
 - ⏸️ **暂停显示**：快捷键（默认 `Ctrl + Alt + P`）暂停 / 恢复，可自行录制
 - 🚀 **开机自启**：设置里一键开关
@@ -48,9 +49,18 @@ sudo dnf install rust cargo gtk4-devel libinput-devel systemd-devel
 
 ### 字体
 
-按键图标（退格、方向键、媒体键、鼠标等）使用 [Nerd Font](https://www.nerdfonts.com/) 的图标，**必须安装一个 Nerd Font**，否则图标会显示成方块。推荐：
+按键图标（退格、方向键、媒体键、鼠标等）用的是 [Nerd Font](https://www.nerdfonts.com/) 的图标。
+所用字体已**编译进二进制**（`font/JetBrainsMonoNerdFont-Bold.ttf`），所以**无需自行安装**，
+没装 Nerd Font 的机器上图标也不会显示成方块。
 
-- [JetBrainsMono Nerd Font](https://www.nerdfonts.com/font-downloads)（程序 CSS 的首选字体）
+启动时程序会把这份字体写到 `$XDG_RUNTIME_DIR/showkey/`，并注册给当前进程的 fontconfig——
+字体不会装进系统，不影响其它程序。
+
+想换字体：替换 `font/JetBrainsMonoNerdFont-Bold.ttf`，并同步改两处字体族名——
+`src/overlay/renderer.rs` 里 CSS 的 `font-family` 与 `src/app/font.rs` 的 `FAMILY`。
+
+字体许可：`font/OFL.txt`（JetBrains Mono，SIL OFL-1.1）、
+`font/LICENSE-nerd-fonts.txt`（Nerd Fonts，MIT）。
 
 ### 运行环境
 
