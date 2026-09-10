@@ -24,7 +24,7 @@ showkey 运行在 Wayland 的 layer-shell 悬浮层上，直接读取输入设�
 - ⏸️ **暂停显示**：快捷键（默认 `Ctrl + Alt + P`）暂停 / 恢复，可自行录制
 - 🚀 **开机自启**：设置里一键开关
 - 👻 **鼠标穿透**：悬浮层不拦截指针事件，点击直接落到底层窗口（可在设置里关闭）
-- ✨ **淡入淡出动画**
+- ✨ **淡入淡出动画**：新增、过期，以及超出最大数量被移除时都平滑过渡
 
 ## 依赖
 
@@ -44,7 +44,7 @@ showkey 运行在 Wayland 的 layer-shell 悬浮层上，直接读取输入设�
 sudo dnf install rust cargo gtk4-devel libinput-devel systemd-devel
 ```
 
-> **gtk4-layer-shell 说明**：本项目当前通过 `.cargo/config.toml` 里的 `PKG_CONFIG_PATH` 指向本地下载的 gtk4-layer-shell 开发库。如果你的发行版提供 `gtk4-layer-shell-devel` 包，可以全局安装后删除该配置文件。运行时需要 `libgtk4-layer-shell.so`（通常随该包或桌面环境安装）。
+> **gtk4-layer-shell 说明**：本项目当前通过 `.cargo/config.toml` 里的 `PKG_CONFIG_PATH` 指向本地下载的 gtk4-layer-shell 开发库。注意该文件里是**本机绝对路径**（含用户名），换机器或换用户后需要改成自己的路径；如果你的发行版提供 `gtk4-layer-shell-devel` 包，也可以全局安装后直接删除该文件。运行时需要 `libgtk4-layer-shell.so`（通常随该包或桌面环境安装）。
 
 ### 字体
 
@@ -65,7 +65,7 @@ sudo dnf install rust cargo gtk4-devel libinput-devel systemd-devel
 ./install.sh
 ```
 
-脚本会依次：编译 release → 安装二进制到 `~/.local/bin/showkey` → 安装图标 → 创建 `.desktop` 应用快捷方式（已存在则跳过）。
+脚本会依次：编译 release → 安装二进制到 `~/.local/bin/showkey` → 安装图标（托盘用的 `$XDG_DATA_HOME/showkey/icon/`，以及桌面快捷方式用的标准图标主题路径）→ 创建 / 覆盖 `.desktop` 应用快捷方式。
 
 手动构建：
 
@@ -142,3 +142,12 @@ cargo run
 | 暂停快捷键 | `Ctrl + Alt + P` |
 | 鼠标穿透 | 开启 |
 | 开机自启 | 关闭 |
+
+## 开发
+
+```bash
+cargo run      # 开发模式运行，无需安装
+cargo test     # 单元测试（配置反序列化的向后兼容）
+cargo fmt      # 提交前格式化
+cargo clippy   # 静态检查
+```
