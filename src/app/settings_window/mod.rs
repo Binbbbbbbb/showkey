@@ -13,13 +13,13 @@ mod widgets;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use gtk4 as gtk;
 use gtk::glib;
 use gtk::prelude::*;
+use gtk4 as gtk;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::config::{Hotkey, Language, Position, Settings, SettingsHandle, Theme};
@@ -30,8 +30,8 @@ use crate::overlay::Overlay;
 use strings::Strings;
 use theme::window_css;
 use widgets::{
-    add_row, add_section, lang_index, make_spin, position_index, screen_height,
-    set_dropdown_items, theme_index,
+    add_row, add_section, lang_index, make_spin, position_index, screen_height, set_dropdown_items,
+    theme_index,
 };
 
 /// 设置窗口宽度（像素）：固定值，所有行按这个宽度测量。
@@ -570,9 +570,11 @@ impl SettingsWindow {
     fn load_into_controls(&self, s: &Settings) {
         *self.syncing.borrow_mut() = true;
         self.theme_dropdown.set_selected(theme_index(s.theme));
-        self.chip_theme_dropdown.set_selected(theme_index(s.chip_theme));
+        self.chip_theme_dropdown
+            .set_selected(theme_index(s.chip_theme));
         self.lang_dropdown.set_selected(lang_index(s.language));
-        self.position_dropdown.set_selected(position_index(s.position));
+        self.position_dropdown
+            .set_selected(position_index(s.position));
         self.alpha_spin.set_value(f64::from(s.chip_alpha) * 100.0);
         self.alpha_history_spin
             .set_value(f64::from(s.chip_alpha_history) * 100.0);

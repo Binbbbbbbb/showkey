@@ -11,12 +11,12 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use input::event::EventTrait;
 use input::event::device::DeviceEvent;
 use input::event::gesture::{
     GestureEndEvent, GestureEvent, GestureEventCoordinates, GestureEventTrait, GestureSwipeEvent,
 };
 use input::event::pointer::{Axis, ButtonState, PointerEvent, PointerScrollEvent};
-use input::event::EventTrait;
 use input::{Event, Libinput, LibinputInterface};
 
 use crate::core::{Accent, Chip};

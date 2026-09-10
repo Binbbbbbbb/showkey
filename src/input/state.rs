@@ -1,8 +1,8 @@
 //! 按键状态管理：跟踪 Ctrl / Shift / Alt / Super 的按下状态，并把
 //! 「修饰键图标 + 按键」组合成 `⇧⌃K` 这种显示字符串。
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use evdev::KeyCode;
@@ -10,8 +10,8 @@ use tokio::sync::mpsc;
 
 use super::evdev::KeyInput;
 use super::keymap::{
-    has_shift_variant, key_label, modifier_label, ALT_ICON, COMBO_SEP, CTRL_ICON, SHIFT_ICON,
-    SUPER_ICON,
+    ALT_ICON, COMBO_SEP, CTRL_ICON, SHIFT_ICON, SUPER_ICON, has_shift_variant, key_label,
+    modifier_label,
 };
 use crate::config::{Hotkey, SettingsHandle};
 use crate::core::{Chip, PauseControl};

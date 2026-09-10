@@ -2,14 +2,14 @@
 
 use std::time::Duration;
 
-use gtk4 as gtk;
 use gtk::glib;
 use gtk::prelude::*;
+use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, LayerShell};
 
+use super::wayland::{build_window, set_click_through};
 use crate::config::{Position, Settings, SettingsHandle, Theme};
 use crate::core::{Accent, Chip};
-use super::wayland::{build_window, set_click_through};
 
 /// 单个胶囊的最小宽度（像素）：满载时窗口宽度 = 最小宽度 × 最大胶囊数。
 const MIN_CHIP_WIDTH: i32 = 72;
@@ -207,7 +207,12 @@ impl Overlay {
     pub fn push(&self, chip: &Chip) {
         let (max_chips, duration, fade_duration, click_through) = {
             let s = self.settings.read().unwrap();
-            (s.max_chips, s.display_duration(), s.fade_duration(), s.click_through)
+            (
+                s.max_chips,
+                s.display_duration(),
+                s.fade_duration(),
+                s.click_through,
+            )
         };
 
         // 新胶囊是最新的：先把上一个最新的胶囊降级为历史样式（透明度不同）

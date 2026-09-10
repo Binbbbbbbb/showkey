@@ -1,7 +1,7 @@
 //! 设置窗口布局的小工具：屏幕高度、数值 / 下拉 / 开关等控件的构造与下拉重建。
 
-use gtk4 as gtk;
 use gtk::prelude::*;
+use gtk4 as gtk;
 
 use crate::config::{Language, Position, Theme};
 
@@ -33,7 +33,11 @@ pub(super) fn add_section(parent: &gtk::Box, title: &str) -> gtk::Label {
 }
 
 /// 追加一行「左 label + 右控件」，返回该 label（供语言切换刷新文案）。
-pub(super) fn add_row(parent: &gtk::Box, title: &str, control: &impl IsA<gtk::Widget>) -> gtk::Label {
+pub(super) fn add_row(
+    parent: &gtk::Box,
+    title: &str,
+    control: &impl IsA<gtk::Widget>,
+) -> gtk::Label {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     row.add_css_class("settings-row");
     let label = gtk::Label::new(Some(title));

@@ -3,8 +3,8 @@
 //! 这一层只负责「窗口本身」：layer-shell 初始化（悬浮层、不抢焦点），返回窗口和
 //! 承载胶囊的水平容器。锚定位置、全局样式与边距的（动态）应用见 [`super::renderer`]。
 
-use gtk4 as gtk;
 use gtk::prelude::*;
+use gtk4 as gtk;
 use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 
 /// 创建并初始化 layer-shell 悬浮窗口，返回窗口和水平胶囊容器。

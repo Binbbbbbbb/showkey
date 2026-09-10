@@ -43,10 +43,7 @@ pub fn find_keyboards() -> Vec<Device> {
 }
 
 /// 持续读取某个键盘，把按下/松开事件发到 `tx`，直到设备断开或出错。
-pub async fn run_keyboard_listener(
-    device: Device,
-    tx: mpsc::Sender<KeyInput>,
-) -> io::Result<()> {
+pub async fn run_keyboard_listener(device: Device, tx: mpsc::Sender<KeyInput>) -> io::Result<()> {
     let mut events = device.into_event_stream()?;
     loop {
         let event = events.next_event().await?;

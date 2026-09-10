@@ -1,7 +1,7 @@
 //! 跨线程共享的运行时控制状态：暂停显示、快捷键录制。
 
-use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 
 use crate::config::Hotkey;
 
