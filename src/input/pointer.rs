@@ -27,6 +27,9 @@ use super::keymap::{COMBO_SEP, Modifier};
 const DOUBLE_CLICK_WINDOW: Duration = Duration::from_millis(300);
 /// 滚动结算的静止时长：最后一次滚动事件过去这么久后，把累计滚动显示成单个胶囊。
 const SCROLL_DEBOUNCE: Duration = Duration::from_millis(150);
+/// libinput 出错后退出前允许的重试次数，以及每次重试前的退避时长。
+const MAX_ERRORS: u32 = 3;
+const ERROR_BACKOFF: Duration = Duration::from_millis(50);
 
 /// Linux 鼠标按键码（libinput 的 `button()` 直接返回这些值）。
 const BTN_LEFT: u32 = 0x110;
@@ -224,6 +227,8 @@ pub fn run_pointer_listener(ui_tx: mpsc::Sender<Chip>) {
     };
 
     let mut state = PointerState::new();
+    // 连续出错次数：出错时 poll 会立刻返回而不阻塞，不退避就是 100% CPU 的忙循环
+    let mut errors: u32 = 0;
 
     loop {
         // 有未结算的滚动时才需要超时（到点结算成胶囊）；没有就无限阻塞等下一个事件，
@@ -241,9 +246,21 @@ pub fn run_pointer_listener(ui_tx: mpsc::Sender<Chip>) {
         let ready = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
 
         if ready > 0 {
-            if input.dispatch().is_err() {
+            // fd 报错（POLLERR / POLLHUP / POLLNVAL）时 poll 不再阻塞，libinput 也
+            // 无法从这个状态恢复；连同 dispatch 失败一起计入错误，短暂退避后重试，
+            // 持续失败就结束指针监听（键盘显示不受影响）。
+            let fd_error = pfd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0;
+            if fd_error || input.dispatch().is_err() {
+                errors += 1;
+                if errors >= MAX_ERRORS {
+                    eprintln!("libinput 持续出错，指针监听已停止");
+                    return;
+                }
+                std::thread::sleep(ERROR_BACKOFF);
                 continue;
             }
+            errors = 0;
+
             for event in &mut input {
                 if let Some(chip) = state.handle(event) {
                     // 接收端已退出（程序准备结束）时停止监听

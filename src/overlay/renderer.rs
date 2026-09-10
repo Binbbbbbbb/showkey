@@ -17,6 +17,12 @@ const MIN_CHIP_WIDTH: i32 = 72;
 /// 淡入 / 淡出的步数（步进间隔由设置的 `fade_duration` 决定）。
 const FADE_STEPS: u32 = 16;
 
+/// 正在淡出的胶囊的标记类（仅作记账用，没有对应样式）。
+///
+/// 超过 `max_chips` 时最旧的胶囊会先淡出、结束后才移出容器；淡出期间它还在容器里，
+/// 靠这个类把它排除在计数与「最旧胶囊」之外，避免连续 push 时重复挑中同一个。
+const LEAVING_CLASS: &str = "key-chip-leaving";
+
 /// 根据设置生成全局 CSS：透明窗口 + 胶囊样式。
 ///
 /// 胶囊配色由 `chip_theme` 决定（独立于界面主题）：黑暗 = 黑底白字，明亮 = 白底黑字。
@@ -229,13 +235,21 @@ impl Overlay {
         }
         self.container.append(&label);
 
-        // 超过上限就移除最旧的那个（最左边）
-        while self.chip_count() > max_chips {
-            if let Some(oldest) = self.container.first_child() {
-                self.container.remove(&oldest);
-            } else {
+        // 超过上限就让最旧的淡出：先标记为 leaving（不再占名额），淡出结束再移除。
+        // 淡出期间它仍留在容器里，观感是「旧的淡出 + 新的淡入」，而不是瞬间消失。
+        while self.active_count() > max_chips {
+            let Some(oldest) = self.oldest_active() else {
                 break;
-            }
+            };
+            oldest.add_css_class(LEAVING_CLASS);
+            let container = self.container.clone();
+            let window = self.window.clone();
+            fade_out(oldest.clone(), fade_duration, move || {
+                if oldest.parent().is_some() {
+                    container.remove(&oldest);
+                }
+                hide_if_empty(&container, &window);
+            });
         }
 
         // 有胶囊就确保窗口可见，并淡入新胶囊。
@@ -244,8 +258,7 @@ impl Overlay {
         set_click_through(&self.window, click_through);
         fade_in(label.clone().upcast(), fade_duration);
 
-        // 每个胶囊独立计时，到点先淡出再移除；若清空则隐藏窗口，
-        // 强制 layer-shell 表面重新映射，避免最后一枚胶囊的画面残留。
+        // 每个胶囊独立计时，到点先淡出再移除。
         // 若该胶囊已因超过上限被提前移除（parent 为空），则跳过，避免重复 remove。
         let container = self.container.clone();
         let window = self.window.clone();
@@ -257,21 +270,42 @@ impl Overlay {
                 if label.parent().is_some() {
                     container.remove(&label);
                 }
-                if container.first_child().is_none() {
-                    window.set_visible(false);
-                }
+                hide_if_empty(&container, &window);
             });
         });
     }
 
-    /// 当前胶囊数量。
-    fn chip_count(&self) -> usize {
-        let mut n: usize = 0;
+    /// 占用名额的胶囊数（正在淡出的不计入，否则连续 push 会重复挑中同一个）。
+    fn active_count(&self) -> usize {
+        self.chips()
+            .filter(|c| !c.has_css_class(LEAVING_CLASS))
+            .count()
+    }
+
+    /// 最旧的、还没开始淡出的胶囊。
+    fn oldest_active(&self) -> Option<gtk::Widget> {
+        self.chips().find(|c| !c.has_css_class(LEAVING_CLASS))
+    }
+
+    /// 容器里的胶囊，从左到右。
+    ///
+    /// `child` 是可变捕获，`from_fn` 的闭包是 `FnMut`，所以要先 `take()` 再推进——
+    /// 直接 `child?` 会把 `Option<Widget>` 移出闭包环境。
+    fn chips(&self) -> impl Iterator<Item = gtk::Widget> {
         let mut child = self.container.first_child();
-        while let Some(c) = child {
-            n += 1;
-            child = c.next_sibling();
-        }
-        n
+        std::iter::from_fn(move || {
+            let current = child.take()?;
+            child = current.next_sibling();
+            Some(current)
+        })
+    }
+}
+
+/// 胶囊清空后隐藏窗口。
+///
+/// 强制 layer-shell 表面重新映射，避免最后一枚胶囊的画面残留。
+fn hide_if_empty(container: &gtk::Box, window: &gtk::ApplicationWindow) {
+    if container.first_child().is_none() {
+        window.set_visible(false);
     }
 }
