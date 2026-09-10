@@ -5,10 +5,7 @@ use std::path::PathBuf;
 /// 自启桌面文件路径：`$XDG_CONFIG_HOME/autostart/showkey.desktop`（回退
 /// `~/.config/autostart/showkey.desktop`）。
 fn autostart_path() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-    Some(base.join("autostart").join("showkey.desktop"))
+    Some(crate::config::xdg::config_dir()?.join("autostart").join("showkey.desktop"))
 }
 
 /// 按 `enabled` 写入或删除自启文件（尽力而为，失败静默忽略）。

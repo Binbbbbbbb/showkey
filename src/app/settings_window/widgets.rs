@@ -5,8 +5,11 @@ use gtk::prelude::*;
 
 use crate::config::{Language, Position, Theme};
 
-/// 屏幕工作区高度（像素），用于限制设置窗口最大高度为屏幕的 60%。取不到就回退 900。
-pub(super) fn screen_workarea_height() -> i32 {
+/// 屏幕高度（像素），用于给设置窗口的默认高度定上限。取不到就回退 900。
+///
+/// 注意是整块显示器的高度而非「工作区」：GDK4 未暴露 `workarea`，且 Wayland 下
+/// 面板 / 栏本来也不缩小它，两者实际等价。
+pub(super) fn screen_height() -> i32 {
     gtk::gdk::Display::default()
         .and_then(|d| d.monitors().item(0))
         .and_then(|m| m.downcast::<gtk::gdk::Monitor>().ok())

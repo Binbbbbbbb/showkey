@@ -4,7 +4,7 @@
 //! 悬浮层里用不同颜色区分（具体颜色由 overlay 的 CSS 按主题映射）。
 
 /// 鼠标按钮的强调色类别（在 overlay 的 CSS 里映射成主题相关的颜色）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 pub enum Accent {
     /// 左键：青蓝
     Left,

@@ -85,6 +85,8 @@ fn main() {
                 settings_window.show();
             }
             if quit.load(Ordering::SeqCst) {
+                // 退出前把还压在防抖计时器里的设置写盘
+                settings_window.flush_save();
                 app.quit();
                 glib::ControlFlow::Break
             } else {

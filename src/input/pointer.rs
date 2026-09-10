@@ -223,13 +223,19 @@ pub fn run_pointer_listener(ui_tx: mpsc::Sender<Chip>) {
     let mut state = PointerState::new();
 
     loop {
-        // poll 带超时：既用于滚动 debounce，也避免无限阻塞
+        // 有未结算的滚动时才需要超时（到点结算成胶囊）；没有就无限阻塞等下一个事件，
+        // 免得空闲时每 150ms 空转一次。
+        let timeout_ms = if state.last_scroll.is_some() {
+            SCROLL_DEBOUNCE.as_millis() as i32
+        } else {
+            -1
+        };
         let mut pfd = libc::pollfd {
             fd: input.as_raw_fd(),
             events: libc::POLLIN,
             revents: 0,
         };
-        let ready = unsafe { libc::poll(&mut pfd, 1, SCROLL_DEBOUNCE.as_millis() as i32) };
+        let ready = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
 
         if ready > 0 {
             if input.dispatch().is_err() {

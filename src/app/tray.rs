@@ -76,11 +76,7 @@ impl Tray for ShowkeyTray {
 /// 图标目录：优先用安装后的固定位置（`$XDG_DATA_HOME/showkey/icon`，回退
 /// `~/.local/share/showkey/icon`）；若还没安装，则回退源码目录（`cargo run` 开发场景）。
 fn icon_dir() -> PathBuf {
-    let data_home = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")));
-
-    if let Some(base) = data_home {
+    if let Some(base) = crate::config::xdg::data_dir() {
         let installed = base.join("showkey").join("icon");
         if installed.exists() {
             return installed;

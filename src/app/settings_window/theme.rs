@@ -33,7 +33,21 @@ pub(super) fn window_css(theme: Theme) -> String {
 }}
 .settings-root {{
     background-color: {bg};
-    padding: 12px 20px 20px 20px;
+}}
+.settings-header {{
+    padding: 14px 20px 10px 20px;
+}}
+.settings-title {{
+    font-size: 15px;
+    font-weight: 600;
+}}
+/* 内边距放在滚动内容上，滚动条才能贴住窗口右缘 */
+.settings-content {{
+    padding: 0 20px;
+}}
+/* 底部按钮栏固定在滚动区外 */
+.settings-footer {{
+    padding: 12px 20px 16px 20px;
 }}
 .section-header {{
     color: {muted};

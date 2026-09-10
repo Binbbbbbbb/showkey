@@ -1,6 +1,7 @@
-//! 程序配置：可调设置的结构体、默认值，以及 TOML 持久化。
+//! 程序配置：可调设置的结构体、默认值，TOML 持久化，以及 XDG 目录解析。
 
 pub mod settings;
+pub mod xdg;
 
 pub use settings::{Hotkey, Language, Position, Settings, Theme};
 

@@ -35,3 +35,16 @@ pub fn build_window(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Box
 
     (window, container)
 }
+
+/// 设置鼠标穿透：把悬浮层表面的输入区域设为空（穿透）或恢复默认（可接收指针事件）。
+///
+/// 空输入区域即 `wl_surface.set_input_region(empty)`：表面照常绘制，但点击 / 滚动都
+/// 不会被它截获，直接落到下面的窗口。关闭时传 `None` 恢复 GDK 默认的整面输入区域。
+/// 表面尚未创建（窗口未 realize）时静默跳过，下次 [`super::renderer::Overlay::apply_settings`] 会补上。
+pub fn set_click_through(window: &gtk::ApplicationWindow, enabled: bool) {
+    let Some(surface) = window.surface() else {
+        return;
+    };
+    let region = enabled.then(gtk::cairo::Region::create);
+    surface.set_input_region(region.as_ref());
+}

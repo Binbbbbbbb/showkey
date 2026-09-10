@@ -9,7 +9,7 @@ use gtk4_layer_shell::{Edge, LayerShell};
 
 use crate::config::{Position, Settings, SettingsHandle, Theme};
 use crate::core::{Accent, Chip};
-use super::wayland::build_window;
+use super::wayland::{build_window, set_click_through};
 
 /// 单个胶囊的最小宽度（像素）：满载时窗口宽度 = 最小宽度 × 最大胶囊数。
 const MIN_CHIP_WIDTH: i32 = 72;
@@ -198,13 +198,16 @@ impl Overlay {
         self.window.set_anchor(v_edge, true);
         self.window.set_margin(h_edge, s.margin_x);
         self.window.set_margin(v_edge, s.margin_y);
+
+        // 鼠标穿透：空输入区域，点击落到底层（设置变化时即时生效）
+        set_click_through(&self.window, s.click_through);
     }
 
     /// 添加一个胶囊，最多 `max_chips` 个，每个独立 `display_duration` 后过期。
     pub fn push(&self, chip: &Chip) {
-        let (max_chips, duration, fade_duration) = {
+        let (max_chips, duration, fade_duration, click_through) = {
             let s = self.settings.read().unwrap();
-            (s.max_chips, s.display_duration(), s.fade_duration())
+            (s.max_chips, s.display_duration(), s.fade_duration(), s.click_through)
         };
 
         // 新胶囊是最新的：先把上一个最新的胶囊降级为历史样式（透明度不同）
@@ -230,8 +233,10 @@ impl Overlay {
             }
         }
 
-        // 有胶囊就确保窗口可见，并淡入新胶囊
+        // 有胶囊就确保窗口可见，并淡入新胶囊。
+        // 窗口重新映射后重设一次穿透，避免某些合成器在 unmap / map 后重置输入区域。
         self.window.set_visible(true);
+        set_click_through(&self.window, click_through);
         fade_in(label.clone().upcast(), fade_duration);
 
         // 每个胶囊独立计时，到点先淡出再移除；若清空则隐藏窗口，
