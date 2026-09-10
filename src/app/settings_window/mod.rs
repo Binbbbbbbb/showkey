@@ -49,6 +49,21 @@ const MAX_HEIGHT_PERCENT: i32 = 75;
 /// 无意义，攒这么久之后只写一次（写入的始终是触发时刻的最新值）。
 const SAVE_DEBOUNCE: Duration = Duration::from_millis(400);
 
+/// 把某个控件的「值变化」信号接到 [`SettingsWindow::on_change`]（实时应用）。
+///
+/// 下拉 / 数值 / 开关的 `connect_*` 方法名不同
+/// （`connect_selected_notify` / `connect_value_changed` / `connect_active_notify`），
+/// 由调用处传进来；其余写法完全一样，收成一行省掉十几段样板。
+///
+/// 定义位置必须在 `build()` 之前——`macro_rules!` 是文本作用域的。
+macro_rules! watch {
+    ($sw:expr, $field:ident, $connect:ident) => {{
+        let sw = Rc::clone(&$sw);
+        let widget = sw.$field.clone();
+        let _ = widget.$connect(move |_| sw.on_change());
+    }};
+}
+
 /// 设置窗口。控件变化实时生效。
 pub struct SettingsWindow {
     window: gtk::Window,
@@ -326,95 +341,26 @@ impl SettingsWindow {
             button.connect_clicked(move |_| sw.reset());
         }
 
-        // 下拉（主题 / 胶囊配色 / 语言）变化 → 实时应用
-        {
-            let sw = Rc::clone(&sw);
-            let dropdown = sw.theme_dropdown.clone();
-            dropdown.connect_selected_notify(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let dropdown = sw.chip_theme_dropdown.clone();
-            dropdown.connect_selected_notify(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let dropdown = sw.lang_dropdown.clone();
-            dropdown.connect_selected_notify(move |_| sw.on_change());
-        }
+        // 所有可调控件连到 on_change：改动实时生效。
+        // 下拉 / 数值 / 开关的信号名各不相同，用 watch! 收成一行（见宏定义）。
+        watch!(sw, theme_dropdown, connect_selected_notify);
+        watch!(sw, chip_theme_dropdown, connect_selected_notify);
+        watch!(sw, lang_dropdown, connect_selected_notify);
+        watch!(sw, position_dropdown, connect_selected_notify);
 
-        // 数字控件变化 → 实时应用
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.alpha_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.alpha_history_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.radius_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.spacing_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.margin_x_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.margin_y_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.duration_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.max_chips_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.font_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
-        {
-            let sw = Rc::clone(&sw);
-            let spin = sw.fade_spin.clone();
-            spin.connect_value_changed(move |_| sw.on_change());
-        }
+        watch!(sw, alpha_spin, connect_value_changed);
+        watch!(sw, alpha_history_spin, connect_value_changed);
+        watch!(sw, radius_spin, connect_value_changed);
+        watch!(sw, spacing_spin, connect_value_changed);
+        watch!(sw, margin_x_spin, connect_value_changed);
+        watch!(sw, margin_y_spin, connect_value_changed);
+        watch!(sw, duration_spin, connect_value_changed);
+        watch!(sw, max_chips_spin, connect_value_changed);
+        watch!(sw, font_spin, connect_value_changed);
+        watch!(sw, fade_spin, connect_value_changed);
 
-        // 开机自启开关 → 实时应用
-        {
-            let sw = Rc::clone(&sw);
-            let switch = sw.autostart_switch.clone();
-            switch.connect_active_notify(move |_| sw.on_change());
-        }
-
-        // 鼠标穿透开关 → 实时应用
-        {
-            let sw = Rc::clone(&sw);
-            let switch = sw.click_through_switch.clone();
-            switch.connect_active_notify(move |_| sw.on_change());
-        }
-
-        // 位置下拉：实时应用
-        {
-            let sw = Rc::clone(&sw);
-            let dropdown = sw.position_dropdown.clone();
-            dropdown.connect_selected_notify(move |_| sw.on_change());
-        }
+        watch!(sw, autostart_switch, connect_active_notify);
+        watch!(sw, click_through_switch, connect_active_notify);
 
         // 「完成」按钮：关闭设置窗口
         {

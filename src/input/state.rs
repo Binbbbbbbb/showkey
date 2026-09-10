@@ -9,10 +9,7 @@ use evdev::KeyCode;
 use tokio::sync::mpsc;
 
 use super::evdev::KeyInput;
-use super::keymap::{
-    ALT_ICON, COMBO_SEP, CTRL_ICON, SHIFT_ICON, SUPER_ICON, has_shift_variant, key_label,
-    modifier_label,
-};
+use super::keymap::{COMBO_SEP, Modifier, has_shift_variant, key_label, modifier_of};
 use crate::config::{Hotkey, SettingsHandle};
 use crate::core::{Chip, PauseControl};
 
@@ -22,53 +19,51 @@ const RESET_TIMEOUT: Duration = Duration::from_secs(1);
 /// 当前按下的修饰键状态。
 #[derive(Default)]
 pub struct ModifierState {
-    ctrl: bool,
-    shift: bool,
-    alt: bool,
-    super_key: bool,
+    /// 各修饰键是否按下，下标对应 [`Modifier::ALL`] 的顺序。
+    pressed: [bool; 4],
 }
 
 impl ModifierState {
-    /// 按下/松开一个键，更新修饰键状态（非修饰键会被忽略）。
-    pub fn update(&mut self, key: KeyCode, pressed: bool) {
-        match key {
-            KeyCode::KEY_LEFTCTRL | KeyCode::KEY_RIGHTCTRL => self.ctrl = pressed,
-            KeyCode::KEY_LEFTSHIFT | KeyCode::KEY_RIGHTSHIFT => self.shift = pressed,
-            KeyCode::KEY_LEFTALT | KeyCode::KEY_RIGHTALT => self.alt = pressed,
-            KeyCode::KEY_LEFTMETA | KeyCode::KEY_RIGHTMETA => self.super_key = pressed,
-            _ => {}
-        }
+    /// 设置某个修饰键的按下状态。
+    pub fn set(&mut self, modifier: Modifier, pressed: bool) {
+        self.pressed[modifier as usize] = pressed;
+    }
+
+    /// 某个修饰键是否按住。
+    pub fn is_held(&self, modifier: Modifier) -> bool {
+        self.pressed[modifier as usize]
     }
 
     /// 是否按住 Shift。
     pub fn shift_held(&self) -> bool {
-        self.shift
+        self.is_held(Modifier::Shift)
+    }
+
+    /// 当前修饰键状态 + `key` 组成一个 [`Hotkey`]（快捷键录制用）。
+    pub fn to_hotkey(&self, key: KeyCode) -> Hotkey {
+        Hotkey {
+            ctrl: self.is_held(Modifier::Ctrl),
+            shift: self.is_held(Modifier::Shift),
+            alt: self.is_held(Modifier::Alt),
+            super_key: self.is_held(Modifier::Super),
+            key: key.code(),
+        }
     }
 
     /// 当前按下的修饰键显示图标，按 Ctrl → Shift → Alt → Super 的顺序。
     pub fn modifiers(&self) -> Vec<&'static str> {
-        let mut list = Vec::new();
-        if self.ctrl {
-            list.push(CTRL_ICON);
-        }
-        if self.shift {
-            list.push(SHIFT_ICON);
-        }
-        if self.alt {
-            list.push(ALT_ICON);
-        }
-        if self.super_key {
-            list.push(SUPER_ICON);
-        }
-        list
+        Modifier::ALL
+            .iter()
+            .filter(|modifier| self.is_held(**modifier))
+            .map(|modifier| modifier.icon())
+            .collect()
     }
 
     /// 当前按住的修饰键 + 给定按键是否恰好等于 `hotkey`（用于暂停快捷键判定）。
     pub fn matches_hotkey(&self, hotkey: &Hotkey, key: KeyCode) -> bool {
-        self.ctrl == hotkey.ctrl
-            && self.shift == hotkey.shift
-            && self.alt == hotkey.alt
-            && self.super_key == hotkey.super_key
+        Modifier::ALL
+            .iter()
+            .all(|modifier| self.is_held(*modifier) == modifier.required_by(hotkey))
             && key.code() == hotkey.key
     }
 }
@@ -93,10 +88,10 @@ pub async fn report_keys(
 
     while let Some(KeyInput { key, pressed, .. }) = rx.recv().await {
         // 修饰键：更新状态；单独按下时也显示图标
-        if let Some(icon) = modifier_label(key) {
-            modifiers.update(key, pressed);
+        if let Some(modifier) = modifier_of(key) {
+            modifiers.set(modifier, pressed);
             if pressed {
-                let _ = ui_tx.send(Chip::key(icon.to_string()));
+                let _ = ui_tx.send(Chip::key(modifier.icon().to_string()));
                 // 打断连续计数，避免之后的普通键与之前合并成 *N
                 last_combo = None;
             }
@@ -109,13 +104,7 @@ pub async fn report_keys(
 
         // 录制模式：把当前「修饰键 + 按键」作为快捷键捕获，不显示
         if pause_ctl.capture.load(Ordering::SeqCst) {
-            let hotkey = Hotkey {
-                ctrl: modifiers.ctrl,
-                shift: modifiers.shift,
-                alt: modifiers.alt,
-                super_key: modifiers.super_key,
-                key: key.code(),
-            };
+            let hotkey = modifiers.to_hotkey(key);
             *pause_ctl.captured.lock().unwrap() = Some(hotkey);
             pause_ctl.capture.store(false, Ordering::SeqCst);
             last_combo = None;
@@ -135,7 +124,7 @@ pub async fn report_keys(
         let consume_shift = shift && has_shift_variant(key);
         let mut mods = modifiers.modifiers();
         if consume_shift {
-            mods.retain(|m| *m != SHIFT_ICON);
+            mods.retain(|m| *m != Modifier::Shift.icon());
         }
 
         let mut parts: Vec<String> = mods.into_iter().map(str::to_string).collect();

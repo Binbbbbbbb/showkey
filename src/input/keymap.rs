@@ -14,21 +14,64 @@ use evdev::KeyCode;
 use crate::config::Hotkey;
 
 /// 修饰键的显示图标（`nf-md-apple_keyboard_*`）。
-pub const CTRL_ICON: &str = "\u{F0634}";
-pub const SHIFT_ICON: &str = "\u{F0636}";
-pub const ALT_ICON: &str = "\u{F0635}";
-pub const SUPER_ICON: &str = "\u{F0633}";
+const CTRL_ICON: &str = "\u{F0634}";
+const SHIFT_ICON: &str = "\u{F0636}";
+const ALT_ICON: &str = "\u{F0635}";
+const SUPER_ICON: &str = "\u{F0633}";
 
 /// 组合键中修饰键与按键之间的分隔符（如 `⌘ + H`）。
 pub const COMBO_SEP: &str = " + ";
 
-/// 修饰键 → 显示图标。非修饰键返回 `None`。
-pub fn modifier_label(key: KeyCode) -> Option<&'static str> {
+/// 修饰键类别。
+///
+/// **声明顺序即显示顺序**（Ctrl → Shift → Alt → Super），与 [`Modifier::ALL`] 一致；
+/// [`crate::input::state::ModifierState`] 直接用 `as usize` 当下标，所以要调整顺序或
+/// 新增修饰键，改这里一处即可。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Modifier {
+    Ctrl,
+    Shift,
+    Alt,
+    Super,
+}
+
+impl Modifier {
+    /// 全部修饰键，按显示顺序。
+    pub const ALL: [Modifier; 4] = [
+        Modifier::Ctrl,
+        Modifier::Shift,
+        Modifier::Alt,
+        Modifier::Super,
+    ];
+
+    /// 组合键里显示的图标。
+    pub fn icon(self) -> &'static str {
+        match self {
+            Modifier::Ctrl => CTRL_ICON,
+            Modifier::Shift => SHIFT_ICON,
+            Modifier::Alt => ALT_ICON,
+            Modifier::Super => SUPER_ICON,
+        }
+    }
+
+    /// 该修饰键在 `hotkey` 里是否被要求按住。
+    pub fn required_by(self, hotkey: &Hotkey) -> bool {
+        match self {
+            Modifier::Ctrl => hotkey.ctrl,
+            Modifier::Shift => hotkey.shift,
+            Modifier::Alt => hotkey.alt,
+            Modifier::Super => hotkey.super_key,
+        }
+    }
+}
+
+/// 该按键属于哪个修饰键（左右各一枚都算）；非修饰键返回 `None`。
+pub fn modifier_of(key: KeyCode) -> Option<Modifier> {
     Some(match key {
-        KeyCode::KEY_LEFTCTRL | KeyCode::KEY_RIGHTCTRL => CTRL_ICON,
-        KeyCode::KEY_LEFTSHIFT | KeyCode::KEY_RIGHTSHIFT => SHIFT_ICON,
-        KeyCode::KEY_LEFTALT | KeyCode::KEY_RIGHTALT => ALT_ICON,
-        KeyCode::KEY_LEFTMETA | KeyCode::KEY_RIGHTMETA => SUPER_ICON,
+        KeyCode::KEY_LEFTCTRL | KeyCode::KEY_RIGHTCTRL => Modifier::Ctrl,
+        KeyCode::KEY_LEFTSHIFT | KeyCode::KEY_RIGHTSHIFT => Modifier::Shift,
+        KeyCode::KEY_LEFTALT | KeyCode::KEY_RIGHTALT => Modifier::Alt,
+        KeyCode::KEY_LEFTMETA | KeyCode::KEY_RIGHTMETA => Modifier::Super,
         _ => return None,
     })
 }
@@ -118,21 +161,13 @@ pub fn key_label(key: KeyCode, shift: bool) -> String {
     debug.strip_prefix("KEY_").unwrap_or(&debug).to_string()
 }
 
-/// 把快捷键组合渲染成显示字符串（修饰键图标 + 按键），如 `⌃⌥ + P`。
+/// 把快捷键组合渲染成显示字符串（修饰键图标 + 按键），如 `⌃ + ⌥ + P`。
 pub fn hotkey_label(hotkey: &Hotkey) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    if hotkey.ctrl {
-        parts.push(CTRL_ICON.to_string());
-    }
-    if hotkey.shift {
-        parts.push(SHIFT_ICON.to_string());
-    }
-    if hotkey.alt {
-        parts.push(ALT_ICON.to_string());
-    }
-    if hotkey.super_key {
-        parts.push(SUPER_ICON.to_string());
-    }
+    let mut parts: Vec<String> = Modifier::ALL
+        .iter()
+        .filter(|modifier| modifier.required_by(hotkey))
+        .map(|modifier| modifier.icon().to_string())
+        .collect();
     parts.push(key_label(KeyCode::new(hotkey.key), false));
     parts.join(COMBO_SEP)
 }

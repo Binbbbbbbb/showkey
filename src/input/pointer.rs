@@ -21,7 +21,7 @@ use input::{Event, Libinput, LibinputInterface};
 
 use crate::core::{Accent, Chip};
 
-use super::keymap::{COMBO_SEP, SUPER_ICON};
+use super::keymap::{COMBO_SEP, Modifier};
 
 /// 双击判定窗口。
 const DOUBLE_CLICK_WINDOW: Duration = Duration::from_millis(300);
@@ -201,7 +201,10 @@ fn swipe_chip(fingers: u32, dx: f64, dy: f64) -> Option<Chip> {
         4 if dy < 0.0 && dy.abs() >= dx.abs() => "D",
         _ => return None,
     };
-    Some(Chip::key(format!("{SUPER_ICON}{COMBO_SEP}{letter}")))
+    Some(Chip::key(format!(
+        "{}{COMBO_SEP}{letter}",
+        Modifier::Super.icon()
+    )))
 }
 
 /// 在独立线程里跑 libinput 事件循环，把点击 / 滚轮 / 手势发到 `ui_tx`。
